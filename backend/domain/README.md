@@ -15,3 +15,6 @@ The terminal runner is still read-only; router integration belongs to A4.
 
 A4 router, trusted-session requirements, public request/response examples,
 and synthetic PostgreSQL terminal checks: [API.md](API.md).
+
+A5 offline reliability checks and explicitly labeled synthetic comparison:
+[A5_EVALUATION.md](A5_EVALUATION.md).
