@@ -18,3 +18,6 @@ and synthetic PostgreSQL terminal checks: [API.md](API.md).
 
 A5 offline reliability checks and explicitly labeled synthetic comparison:
 [A5_EVALUATION.md](A5_EVALUATION.md).
+
+A6 seed and release preparation, with signoff still pending:
+[A6_RELEASE.md](A6_RELEASE.md).
