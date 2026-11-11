@@ -86,3 +86,45 @@ with A2 offline while keeping real-model acceptance pending. See
 [NEGOTIATION.md](NEGOTIATION.md) for that implementation and its boundaries.
 The earlier test results and live failure evidence above are unchanged. This
 authorization does not turn a failed live smoke into a passing A1 gate.
+
+## Follow-up verification — November 12, 2026
+
+The configured model was explicitly selected as `gemini-3.8-flash` for this
+attempt. Configuration validation passed, but a real buyer-action smoke request
+returned `code=timeout, http=504`. No action was accepted. A1's live acceptance
+gate remains open, and this response does not establish that the credentials
+or model can complete generation.
+
+The seller's actual minimum inclusive price remains a team decision. The
+existing 30000-cent floor is an explicitly synthetic development input only;
+it is not merchant approval and must not become a default commercial policy.
+An optional live-model demonstration may use that synthetic scenario if clearly
+labeled, but it cannot demonstrate merchant-approved terms. A2's live gate
+still requires an actual completed model negotiation, separately from offline
+fixture results. Before merchant-backed integration, the team must supply the
+real seller policy and verify the resulting flow.
+
+Focused A1/A2 offline regression after this attempt: 418 passed. No provider
+output, private inputs, or credentials are recorded here.
+
+## Further live retry — November 12, 2026
+
+The authorized `gemini-3.8-flash` buyer-action smoke was retried with a
+60000 ms timeout and low thinking; it again returned HTTP 504 without an
+action. A separate minimal generation request to the same model, containing
+only a non-sensitive prompt and no negotiation schema, also returned HTTP 504.
+This shows the failure is not limited to the structured negotiation request;
+it does not identify whether the cause is the provider, account, or network
+path. The first diagnostic invocation had a command-line quoting error and made
+no request; the corrected invocation produced the result above.
+
+A1 and A2 live gates remain unverified. The A2 live negotiation was not run
+because A1 did not produce an action. Do not replace this result with a fixture
+or present the synthetic seller minimum as merchant policy.
+
+The model catalog subsequently listed both `gemini-3.8-flash` and
+`gemini-3.7-flash` as generation-capable. Listing confirms only catalog access,
+not successful inference. With explicit user authorization, a 3.7 Flash smoke
+request and a separate minimal, non-sensitive generation request both returned
+HTTP 503. Neither request produced an action. The local `.env` was not changed.
+The A1 and A2 live gates remain open.

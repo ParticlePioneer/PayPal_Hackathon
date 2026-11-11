@@ -162,3 +162,13 @@ approvals. Review findings and dispositions:
 
 Offline implementation acceptance passed. Real A1 smoke and A2 live negotiation
 acceptance remain pending. No A3 or later work was implemented.
+
+## Follow-up: synthetic versus merchant policy
+
+The A3 domain implementation was subsequently added; the earlier A2-only
+statements above describe its original verification. For a development demo,
+the existing explicit 30000-cent fixture floor may be used as synthetic seller
+policy, clearly labeled as such. Do not present it as the merchant's approved
+minimum or silently use it for merchant-backed checkout. A real policy is still
+needed before that integration. Live A1 and A2 outcomes remain unverified; the
+November 12 smoke attempt returned HTTP 504, as recorded in `A1_STATUS.md`.

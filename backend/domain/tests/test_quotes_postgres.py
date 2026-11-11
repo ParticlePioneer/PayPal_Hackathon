@@ -34,7 +34,7 @@ def domain(monkeypatch):
         admin.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
     database = DomainDatabase(dsn, schema=schema)
     try:
-        assert apply_migrations(database) == 1
+        assert apply_migrations(database) == 2
         # Only the fixture negotiation is simulated. All inventory, quote,
         # claim, rollback, clock, and race behavior below uses real PostgreSQL.
         monkeypatch.setattr(negotiation, "call_agent_bounded", lambda source, actor, data, timeout: getattr(source, f"generate_{actor}")(data))
@@ -84,7 +84,7 @@ def outcome_of(function):
 
 def test_migration_replay_and_checksum_drift(domain):
     assert apply_migrations(domain.database) == 0
-    assert count_rows(domain, "domain_schema_migrations") == 1
+    assert count_rows(domain, "domain_schema_migrations") == 2
     with domain.database.transaction() as connection:
         connection.execute("UPDATE domain_schema_migrations SET checksum = 'test_only_drift'")
     with pytest.raises(DomainError) as caught:
