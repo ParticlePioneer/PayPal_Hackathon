@@ -30,3 +30,15 @@ B2?B6 still need actual payment endpoints, checkout, persistence integration, re
 ## Verify deployed dependencies
 
 After deploying this code, in the Render web service's Environment page set `RUN_B1_CHECKS` to `true` and save and redeploy. Open the service's Logs page and look for `B1 database check PASSED (SELECT 1).` and `B1 PayPal Sandbox OAuth check PASSED.` The checks run once in a background thread at startup; they do not expose an HTTP endpoint or print credentials. A FAILED message is deliberately generic. After collecting the results, remove the variable or set it to `false` and redeploy. `/health` remains a process-only check. These checks do not apply or validate migrations.
+
+## B2 Sandbox checkout harness
+
+The test harness is disabled by default and uses a simulated USD 1 quote; it does not reserve inventory and is not integrated with the domain quote adapter. No capture is implemented. Only use Sandbox credentials. The test creates real Sandbox authorizations, not real-money payments.
+
+To run on Render, deploy this revision and set `B2_RUN_MIGRATIONS=true` and `B2_HARNESS_ENABLED=true` on the web service, then redeploy. Startup applies domain migrations followed by payment migrations, transactionally within each migration set and with checksums. Confirm the log says `B2 domain and payment migrations completed.` If migration fails, startup fails without logging database credentials. This modifies the configured database; coordinate with the team before running it.
+
+Open `/test-checkout` in a fresh browser session. Approve using a Sandbox personal buyer account and confirm the page displays an authorization ID. Test cancellation in another fresh browser session. Refresh the first session to check that the authorization is restored. After testing, remove both B2 environment variables or set them to false and redeploy. The test page is publicly accessible while enabled; it is intended for temporary Sandbox testing only.
+
+For a local installation, set environment variables in the process and run domain migrations with `python -m backend.domain.migrate` followed by payment migrations with `python -m backend.payments.migrate`; the application does not automatically read `.env`. Alternatively the startup migration flag above runs both. Never share database URLs or secrets. Unit/API tests: `python -m unittest discover -s backend/payments/tests -v` (requires `httpx`).
+
+This harness does not yet reconcile unknown provider outcomes, recover in-progress work after an interrupted database write, or integrate Member A's persistent quote claims. An uncertain operation must remain pending and must not be replaced with a new quote. B3/B4 must complete reconciliation and domain integration before release.
