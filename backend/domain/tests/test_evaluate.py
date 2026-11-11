@@ -31,6 +31,12 @@ def test_six_labeled_cases_compare_both_simulated_sources_under_same_limit():
             assert result["server_accepted_terms"] == case["expected_deal"]
 
 
+def test_budget_shortfall_has_no_overlap_between_private_price_limits():
+    name, expected, scenario = next(case for case in scenarios() if case[0] == "budget_shortfall")
+    assert name == "budget_shortfall" and expected is False
+    assert scenario.buyer.budget_cents < scenario.seller.policy.minimum_total_cents
+
+
 class BadPriceAgents:
     def generate_buyer(self, data):
         proposal = next((event for event in reversed(data.shared.events) if event.issued_offer_id), None)

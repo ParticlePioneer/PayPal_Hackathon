@@ -2,8 +2,9 @@
 
 A5's offline checks exercise the existing negotiation and quote boundaries. They
 do not make Gemini or PayPal calls and do not establish real-model performance.
-The A1/A2 live-model gates remain open, and the actual merchant floor is still
-needed before merchant-backed checkout. The project checkout used for these
+The A1/A2 live-model gates were still open at the time of the offline checks;
+later local Gemini 3.6 verification is recorded in [A1_STATUS.md](A1_STATUS.md).
+The actual merchant floor is still needed before merchant-backed checkout. The project checkout used for these
 checks can be identified with `git rev-parse HEAD`; no frozen experimental
 data or results are read or modified by this evaluation harness.
 
@@ -16,7 +17,7 @@ sources use the same validated scenario, six-turn cap and timing limits.
 |---|---|---|
 | `feasible_split` | Agreement possible | 12 navy Friday, 18 black Monday, 35400 cents |
 | `impossible_deadline` | No deal | Only eight allowed shirts are available by Friday |
-| `budget_shortfall` | No deal | Buyer budget 34000 cents, offered split 35400 cents |
+| `budget_shortfall` | No deal | Buyer budget 29000 cents, synthetic seller floor 30000 cents |
 | `forbidden_color` | No deal | Buyer accepts navy only; remaining stock is black |
 | `competing_buyer_depleted` | No deal | Second buyer sees zero Friday stock after prior allocation |
 | `ordinary_order` | Agreement possible | Ten navy shirts, one Monday delivery |
@@ -47,13 +48,49 @@ expected outcomes for both simulated sources: two eligible agreements and four
 no-deals each. Each source made one ineligible proposal in the budget-shortfall
 case; the server did not accept that proposal. Zero quotes were issued. These
 counts are not AI evaluation results and must not be presented as such.
+That historical fixture run used the earlier 34000-cent budget and a
+30000-cent seller floor. Those limits overlap, so its expected no-deal label
+was not valid for a flexible negotiator, despite both scripted sources declining.
+The original counts above remain recorded; the current scenario uses a budget
+below the seller floor so that its no-deal expectation is justified.
+
+## Initial live comparison and case correction — November 12, 2026
+
+An initial live run used Gemini 3.6 Flash and the earlier 34000-cent budget
+case. Three candidate outcomes matched the original labels; two ended with
+retryable provider/model errors. In the budget case the agents reached terms
+that the server accepted, so the result differed from the original no-deal
+label. The original budget and floor allowed an overlap; a deal was therefore
+possible. This was a scenario-label error, not evidence that the accepted
+agreement violated the buyer budget or seller floor. No quotes were issued.
+The case was subsequently corrected to a 29000-cent synthetic budget; results
+from the two case versions must not be combined or treated as the same run.
+
+## Corrected live comparison — November 12, 2026
+
+The corrected 29000-cent-budget comparison was run separately with Gemini 3.6
+Flash. The scripted baseline matched all six expected outcomes. The live
+candidate completed the feasible-split case with a decline, which did not match
+the benchmark's target agreement; five other cases ended in retryable model
+errors and were not scored as matches or mismatches. No candidate terms were
+accepted and no quotes were issued in this run. One candidate proposal in the
+feasible case was ineligible under the server's scenario checks. A decline on a
+feasible scenario differs from the benchmark target but is not automatically an
+invalid action.
+
+After this comparison, a separate minimal request returned HTTP 429
+`RESOURCE_EXHAUSTED`. A subsequent sanitized diagnostic indicated a daily
+limit and provided a retry delay of 33910 seconds. This is evidence of a quota
+limit at diagnostic time; the evaluation's generic model-error results do not
+identify the exact cause of each earlier failed call. The live comparison is
+incomplete and must be rerun after quota becomes available.
 
 After provider access is restored, an explicitly authorized live comparison can
 use `--candidate live` and the desired `--env-file`. It uses the same synthetic
 scenarios and records the configured model ID; failures are reported as failures,
 with no scripted fallback. Live runs may incur provider usage and may take up to
 the configured per-turn limit for each case. Live performance counts remain
-pending. A matching outcome in synthetic evaluation does not prove real seller
+pending in full. A matching outcome in synthetic evaluation does not prove real seller
 policy approval or payment integration.
 
 ## Reliability evidence and limits

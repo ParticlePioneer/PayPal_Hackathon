@@ -128,3 +128,33 @@ not successful inference. With explicit user authorization, a 3.7 Flash smoke
 request and a separate minimal, non-sensitive generation request both returned
 HTTP 503. Neither request produced an action. The local `.env` was not changed.
 The A1 and A2 live gates remain open.
+
+## Live verification with Gemini 3.6 Flash — November 12, 2026
+
+After a further 3.8 Flash HTTP 504 and a 3.7 Flash HTTP 503, non-sensitive
+minimal API diagnostics returned HTTP 200 with candidates for 3.6 Flash and 3.5
+Flash. Gemini 3.6 Flash then passed the real buyer structured-action smoke test:
+the returned `offer` parsed successfully. A separate spawned-worker check also
+parsed an action. These are real provider calls, not fixture responses.
+
+The first real 3.6 two-agent attempt stopped with a retryable model error on
+turn one and produced no agreement. A subsequent real run, using explicitly
+synthetic stock and seller policy, completed in three turns: a buyer proposal,
+a seller counter for 12 navy Friday and 18 black Monday at 35400 cents, and a
+buyer acceptance. The A2 server accepted the split terms; the terminal runner
+issued no quote, reserved no stock, and initiated no payment. The first worker
+diagnostic command had a local import-path error and made no provider request;
+its corrected retry succeeded.
+
+The user subsequently approved setting the ignored local `.env` model to
+`gemini-3.6-flash`; other parsed settings, including the API key, were preserved.
+These checks establish A1's model-action gate and the A2 live negotiation gate
+for this configured model and synthetic scenario. They do not establish real
+merchant policy, complete A5 live evaluation results, or integrated checkout.
+
+After the user's approved 3.6 Flash A5 live comparison, a separate minimal
+generation diagnostic returned HTTP 429 `RESOURCE_EXHAUSTED`. A second
+sanitized request indicated a daily limit and a retry delay of 33910 seconds.
+This does not prove the causes of prior 503/504 responses or every failed A5
+model call. The corrected A5 comparison remains incomplete; see
+[A5_EVALUATION.md](A5_EVALUATION.md).

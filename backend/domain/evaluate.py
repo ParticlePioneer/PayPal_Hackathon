@@ -23,7 +23,10 @@ def scenarios():
     """Public development cases; the merchant floors and stock are synthetic."""
     base = fixture_scenario(30000)
     short = fixture_scenario(30000, shortfall=True)
-    budget = NegotiationScenario(buyer=BuyerPrivateInput(requirements=base.buyer.requirements, budget_cents=34000), seller=base.seller)
+    # An actual price infeasibility requires the buyer ceiling to be below the
+    # synthetic seller floor. A budget below only the opening offer can still
+    # allow a valid negotiated counteroffer.
+    budget = NegotiationScenario(buyer=BuyerPrivateInput(requirements=base.buyer.requirements, budget_cents=29000), seller=base.seller)
     restricted = BuyerRequirements(**{**base.buyer.requirements.model_dump(), "allowed_colors": ("navy",)})
     forbidden = NegotiationScenario(buyer=BuyerPrivateInput(requirements=restricted, budget_cents=36000), seller=base.seller)
     depleted_seller = SellerPrivateInput(

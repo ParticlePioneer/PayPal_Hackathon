@@ -1,10 +1,12 @@
 # A6 release preparation — signoff pending
 
 The domain implementation can be exercised locally with PostgreSQL and
-explicitly synthetic fixtures. **This is not a release signoff.** Real Gemini
-A1/A2 acceptance, A5 live-model results, actual merchant policy, and the
-integrated A/B/C checkout are still pending. The team must run release checks
-against its final configuration and commit before claiming completion.
+explicitly synthetic fixtures. **This is not a release signoff.** Gemini 3.6
+has passed a live action smoke and a synthetic-policy live negotiation locally;
+actual merchant policy and integrated A/B/C checkout are still pending. An A5
+live comparison was attempted but is incomplete; its results and the final
+release configuration must be recorded against the release commit before
+claiming completion.
 
 ## Dependencies and application integration
 
@@ -25,14 +27,14 @@ build or deployed integration.
 
 ## Model selection
 
-`gemini-3.8-flash` is the user's current candidate model, not a verified release
-pin: structured and minimal live requests have returned HTTP 504. The separately
-authorized 3.7 test returned HTTP 503. `GEMINI_MODEL` is required explicitly;
-the domain client has no automatic model fallback. Once provider access is
-restored, the team must select and pin the exact working ID in the release
-configuration, run the real A1 action smoke, A2 negotiation, and A5 comparison,
-and record the result against the release commit. Do not label fixture output
-as live model evidence or put keys in source control.
+The user approved `gemini-3.6-flash` as the local configured model. It passed a
+real action smoke and completed one live negotiation with synthetic policy; see
+[A1_STATUS.md](A1_STATUS.md). The earlier 3.8 and 3.7 requests returned HTTP 504
+and 503 respectively. `GEMINI_MODEL` is required explicitly; the domain client
+has no automatic fallback. The deployment must explicitly configure the tested
+model, and the team must repeat release checks and record A5 live comparison
+results against the release commit. Do not label fixture output as live model
+evidence or put keys in source control.
 
 ## Synthetic stock seed
 
@@ -93,8 +95,8 @@ about live inventory.
 
 1. Confirm the real merchant's floor and stock and use them as trusted server
    inputs; the synthetic 30000-cent A5 floor is not merchant approval.
-2. Verify the chosen Gemini model with a real action, live negotiation and
-   six-case comparison; keep timeout/provider failures visible.
+2. Verify the configured Gemini model in the release environment with a real
+   action, live negotiation and six-case comparison; keep provider failures visible.
 3. Member B mounts the domain router and adapter, establishes the shared trusted
    session and payment reconciliation, installs both dependency sets, and runs
    domain migrations before payment migrations.

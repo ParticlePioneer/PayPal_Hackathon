@@ -172,3 +172,17 @@ policy, clearly labeled as such. Do not present it as the merchant's approved
 minimum or silently use it for merchant-backed checkout. A real policy is still
 needed before that integration. Live A1 and A2 outcomes remain unverified; the
 November 12 smoke attempt returned HTTP 504, as recorded in `A1_STATUS.md`.
+
+## Subsequent real-model verification
+
+On November 12, 2026, Gemini 3.6 Flash passed the structured buyer smoke and
+completed a real live negotiation using the explicitly synthetic 30000-cent
+seller floor and fixture stock. In three turns the agents reached the validated
+35400-cent split: 12 navy Friday and 18 black Monday. The terminal result had
+`quote: null`; no stock reservation or payment was made. An earlier live attempt
+that day ended in a retryable model error and produced no agreement.
+
+The user approved 3.6 Flash for the local configuration. These checks supersede
+the earlier pending A1/A2 live-status statements above for the local synthetic
+scenario; they do not prove actual merchant policy, provider reliability, or
+integrated checkout. The earlier fixture-only evidence remains unchanged.
