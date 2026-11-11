@@ -42,4 +42,4 @@ The frontend is a placeholder and works without provider credentials. Run `npm r
 
 ## Integration notes
 
-The plan specifies one FastAPI service and PostgreSQL database. Apply domain migrations before payment migrations when those are implemented. The frontend checkout slot currently displays a disabled placeholder; no real PayPal or AI calls are made. See [QA](qa/README.md) for the initial acceptance-work area.
+The plan specifies one FastAPI service and PostgreSQL database. Apply domain migrations before payment migrations when those are implemented. The frontend checkout slot currently displays a disabled placeholder; no real PayPal or AI calls are made. See [payments setup](backend/payments/README.md) for the B1 Sandbox check, migration, and deployment preparation, and [QA](qa/README.md) for the acceptance-work area.
