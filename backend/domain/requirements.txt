@@ -4,5 +4,6 @@ google-genai>=1.75,<2
 python-dotenv>=1.2,<2
 # Explicit because the client classifies HTTPX transport/timeout exceptions.
 httpx>=0.28.1,<1
+fastapi>=0.115,<1.0
 # PostgreSQL transactions and row locks for inventory/quote persistence.
 psycopg[binary]>=3.2,<4

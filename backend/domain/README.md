@@ -12,3 +12,6 @@ A3 persistence and the server-side quote adapter are available separately:
 [PERSISTENCE.md](PERSISTENCE.md). This includes PostgreSQL migration, atomic
 reservations, ownership, durable authorization claims, and expiry recovery.
 The terminal runner is still read-only; router integration belongs to A4.
+
+A4 router, trusted-session requirements, public request/response examples,
+and synthetic PostgreSQL terminal checks: [API.md](API.md).
