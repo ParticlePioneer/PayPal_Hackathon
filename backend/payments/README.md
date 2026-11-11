@@ -41,4 +41,14 @@ Open `/test-checkout` in a fresh browser session. Approve using a Sandbox person
 
 For a local installation, set environment variables in the process and run domain migrations with `python -m backend.domain.migrate` followed by payment migrations with `python -m backend.payments.migrate`; the application does not automatically read `.env`. Alternatively the startup migration flag above runs both. Never share database URLs or secrets. Unit/API tests: `python -m unittest discover -s backend/payments/tests -v` (requires `httpx`).
 
-This harness does not yet reconcile unknown provider outcomes, recover in-progress work after an interrupted database write, or integrate Member A's persistent quote claims. An uncertain operation must remain pending and must not be replaced with a new quote. B3/B4 must complete reconciliation and domain integration before release.
+The harness does not integrate Member A's persistent quote claims. An uncertain operation must remain pending and must not be replaced with a new quote. The limited B3 recovery procedure below and domain integration need end-to-end testing before release.
+
+## B3 Sandbox capture and reconciliation
+
+The merchant API is restricted to the Sandbox harness. Enable `B2_HARNESS_ENABLED=true` and `B3_CAPTURE_ENABLED=true`, and configure a high-entropy secret of at least 32 characters as `B3_MERCHANT_TOKEN` in the server environment. Requests must include `Authorization: Bearer <merchant token>`; never place the token in the browser or commit it. When finished, disable both flags and remove the token.
+
+After simulated fulfillment, POST `/api/merchant/payments/authorizations/{authorization_id}/capture`. The server looks up the authorization and its saved amount; it does not take an amount from the caller. An uncertain capture can be retried using the same endpoint and same authorization ID within one hour. A PostgreSQL advisory lock and a durable operation ID serialize concurrent captures. Older uncertain operations require manual reconciliation; never create a new quote to work around an unknown result. Completed captures are returned again without a second provider request.
+
+To test a lost response, additionally set `B3_ALLOW_FAULT_INJECTION=true`, then send `X-B3-Simulate-Lost-Response: true` on the first capture request. PayPal processes the Sandbox capture, but the server discards the response and returns 503. Retry without that header using the same authorization ID; the existing PayPal request ID is reused and the capture ID should be returned. Disable the fault injection flag after testing.
+
+For an uncertain order or authorization, the merchant can POST `/api/merchant/payments/quotes/{quote_id}/reconcile/{order|authorize}`. This reuses the persisted provider request ID; it is blocked for the first minute and after one hour. The buyer-facing status endpoint includes the capture ID. This is a test-only implementation; connecting real merchant fulfillment, durable domain claims, authorization/reconciliation state and access controls remains B4 work.

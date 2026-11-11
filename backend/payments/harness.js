@@ -11,14 +11,19 @@
     const saved = await fetch('/api/payments/quotes/' + encodeURIComponent(session.quote_id));
     if (!saved.ok) throw new Error('Could not recover payment status');
     const state = await saved.json();
+    const capture = state.operations.find((operation) => operation.operation_type === 'capture');
     const authorization = state.operations.find((operation) => operation.operation_type === 'authorize');
     const uncertain = state.operations.find((operation) => operation.status === 'pending' || operation.status === 'unknown');
-    if (authorization && authorization.status === 'succeeded') {
-      status.textContent = 'Authorized. Authorization ID: ' + authorization.paypal_authorization_id;
+    if (capture && capture.status === 'succeeded') {
+      status.textContent = 'Captured. Capture ID: ' + capture.paypal_capture_id;
       return;
     }
     if (uncertain) {
       status.textContent = 'Payment outcome pending. Do not start another checkout.';
+      return;
+    }
+    if (authorization && authorization.status === 'succeeded') {
+      status.textContent = 'Authorized. Authorization ID: ' + authorization.paypal_authorization_id;
       return;
     }
     const script = document.createElement('script');

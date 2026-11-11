@@ -100,7 +100,7 @@ def create_order(body: OrderRequest, request: Request, b2_session: str | None = 
             raise provider.ProviderError("Invalid order response")
     except provider.ProviderError:
         with database() as conn:
-            conn.execute("UPDATE payment_operations SET status = 'unknown', updated_at = clock_timestamp() WHERE operation_id = %s", (operation,))
+            conn.execute("UPDATE payment_operations SET status = 'unknown', updated_at = clock_timestamp() WHERE operation_id = %s AND status <> 'succeeded'", (operation,))
         raise HTTPException(503, "Order outcome unknown; do not retry with a new quote") from None
     with database() as conn:
         conn.execute("UPDATE payment_operations SET status = 'succeeded', paypal_order_id = %s, updated_at = clock_timestamp() WHERE operation_id = %s", (order_id, operation))
@@ -137,7 +137,7 @@ def authorize(order_id: str, request: Request, b2_session: str | None = Cookie(d
         auth_id = auth["id"]
     except (provider.ProviderError, AttributeError, TypeError, IndexError):
         with database() as conn:
-            conn.execute("UPDATE payment_operations SET status = 'unknown', updated_at = clock_timestamp() WHERE operation_id = %s", (operation,))
+            conn.execute("UPDATE payment_operations SET status = 'unknown', updated_at = clock_timestamp() WHERE operation_id = %s AND status <> 'succeeded'", (operation,))
         raise HTTPException(503, "Authorization outcome unknown; do not retry with a new quote") from None
     with database() as conn:
         conn.execute("UPDATE payment_operations SET status = 'succeeded', paypal_authorization_id = %s, updated_at = clock_timestamp() WHERE operation_id = %s", (auth_id, operation))
@@ -152,5 +152,5 @@ def payment_status(quote_id: str, b2_session: str | None = Cookie(default=None))
         exists = conn.execute("SELECT 1 FROM payment_test_quotes WHERE id = %s AND session_id = %s", (quote_id, owner)).fetchone()
         if not exists:
             raise HTTPException(404, "Quote not found")
-        rows = conn.execute("SELECT operation_type, status, paypal_order_id, paypal_authorization_id FROM payment_operations WHERE quote_id = %s AND session_id = %s ORDER BY created_at", (quote_id, owner)).fetchall()
+        rows = conn.execute("SELECT operation_type, status, paypal_order_id, paypal_authorization_id, paypal_capture_id FROM payment_operations WHERE quote_id = %s AND session_id = %s ORDER BY created_at", (quote_id, owner)).fetchall()
     return {"quote_id": quote_id, "operations": rows}

@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response
 from backend.payments.b1_checks import start_checks_if_enabled
 from backend.payments.harness import router as payment_router, enabled
+from backend.payments.capture import router as capture_router
 
 
 @asynccontextmanager
@@ -29,6 +30,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="AgentNegotiate", lifespan=lifespan)
 app.include_router(payment_router)
+app.include_router(capture_router)
 
 
 @app.get("/health")
