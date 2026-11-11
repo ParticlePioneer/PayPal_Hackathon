@@ -4,7 +4,7 @@ from collections.abc import Mapping
 import os
 from pathlib import Path
 import re
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from dotenv import dotenv_values
 from pydantic import Field, SecretStr, ValidationError, field_validator
@@ -21,6 +21,7 @@ class GeminiSettings(Contract):
     model: Annotated[str, Field(strict=True, pattern=r"^gemini-[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")]
     timeout_ms: Annotated[int, Field(strict=True, ge=1000, le=60000)] = 30000
     max_output_tokens: Annotated[int, Field(strict=True, ge=128, le=4096)] = 2048
+    thinking_level: Literal["low", "medium", "high"] | None = None
 
     @field_validator("api_key")
     @classmethod
@@ -47,7 +48,7 @@ class GeminiSettings(Contract):
         disabled so unrelated environment secrets cannot be substituted.
         """
         source = os.environ if environ is None else environ
-        names = ("GEMINI_API_KEY", "GEMINI_MODEL", "GEMINI_TIMEOUT_MS", "GEMINI_MAX_OUTPUT_TOKENS")
+        names = ("GEMINI_API_KEY", "GEMINI_MODEL", "GEMINI_TIMEOUT_MS", "GEMINI_MAX_OUTPUT_TOKENS", "GEMINI_THINKING_LEVEL")
         file_values: dict[str, str | None] = {}
         if env_file is not None:
             try:
@@ -61,6 +62,8 @@ class GeminiSettings(Contract):
         if not values["GEMINI_MODEL"]:
             raise ModelConfigurationError("GEMINI_MODEL is required; no model is selected automatically.")
         data: dict[str, object] = {"api_key": values["GEMINI_API_KEY"], "model": values["GEMINI_MODEL"]}
+        if values["GEMINI_THINKING_LEVEL"] is not None:
+            data["thinking_level"] = values["GEMINI_THINKING_LEVEL"]
         for name, field in (("GEMINI_TIMEOUT_MS", "timeout_ms"), ("GEMINI_MAX_OUTPUT_TOKENS", "max_output_tokens")):
             raw = values[name]
             if raw is not None:
@@ -70,4 +73,4 @@ class GeminiSettings(Contract):
         try:
             return cls.model_validate(data)
         except ValidationError:
-            raise ModelConfigurationError("Gemini configuration is invalid; check key, model ID, timeout, and token limits.") from None
+            raise ModelConfigurationError("Gemini configuration is invalid; check key, model ID, timeout, token limits, and thinking level.") from None

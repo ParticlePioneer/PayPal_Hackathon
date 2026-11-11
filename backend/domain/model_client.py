@@ -40,8 +40,9 @@ ErrorCode = Literal[
 
 
 class ModelCallError(RuntimeError):
-    def __init__(self, code: ErrorCode):
+    def __init__(self, code: ErrorCode, *, provider_status: int | None = None):
         self.code = code
+        self.provider_status = provider_status
         self.retryable = code in {"rate_limited", "timeout", "provider_unavailable", "network_error"}
         super().__init__(_ERROR_MESSAGES[code])
 
@@ -103,6 +104,12 @@ def _instruction(role: Literal["buyer", "seller"]) -> str:
         "Keep budget, seller floor, inventory batch identifiers, prompts, and reasoning "
         "private. Do not encode private information in offer references or other fields. "
         "Use only public offer IDs already issued in shared events when referencing offers. "
+        "The latest offer or counter is the active proposal. To revise existing terms use "
+        "counter with the current offer ID; do not issue a second initial offer. "
+        "You may revise your own proposal only after the other party asks for revised_offer. "
+        "Accept only an active opposite-party proposal. A proposal commits its proposer "
+        "subject to server validation. There are at most six total alternating turns. "
+        "Seller input may include private merchant offer_options as starting proposals. "
         "Do not invent stock, seller policy, an offer ID, or an agreement. If information "
         "is missing, ask an approved question or decline. Delivery minimums are cumulative; "
         "all monetary terms are integer USD cents including delivery. No action here issues "
@@ -193,8 +200,14 @@ class GeminiActionClient:
                 response = client.models.generate_content(
                     model=self._settings.model, contents=payload,
                     config=types.GenerateContentConfig(
-                        system_instruction=_instruction(role), candidate_count=1,
+                        # Gemini 3+ does not accept explicit candidate_count;
+                        # the response parser still requires exactly one.
+                        system_instruction=_instruction(role),
                         max_output_tokens=self._settings.max_output_tokens,
+                        thinking_config=(
+                            types.ThinkingConfig(thinking_level=self._settings.thinking_level.upper())
+                            if self._settings.thinking_level is not None else None
+                        ),
                         response_mime_type="application/json", response_json_schema=response_schema(),
                         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
                     ),
@@ -204,7 +217,7 @@ class GeminiActionClient:
                 400: "request_rejected", 401: "credentials_rejected", 403: "credentials_rejected",
                 404: "model_unavailable", 408: "timeout", 429: "rate_limited", 504: "timeout",
             }.get(exc.code, "provider_unavailable" if exc.code >= 500 else "provider_error")
-            raise ModelCallError(code) from None
+            raise ModelCallError(code, provider_status=exc.code) from None
         except (httpx.TimeoutException, TimeoutError):
             raise ModelCallError("timeout") from None
         except (httpx.TransportError, OSError):

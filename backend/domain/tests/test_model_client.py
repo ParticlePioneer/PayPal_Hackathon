@@ -115,8 +115,9 @@ def test_separate_role_requests_and_client_cleanup(sdk, role):
     config = request["config"]
     assert config.response_json_schema == response_schema()
     assert config.response_mime_type == "application/json"
-    assert config.candidate_count == 1 and config.max_output_tokens == 2048
+    assert config.candidate_count is None and config.max_output_tokens == 2048
     assert config.automatic_function_calling.disable is True
+    assert config.thinking_config is None
     factory.return_value.__exit__.assert_called_once()
     client.models.generate_content.assert_called_once()
 
@@ -253,6 +254,7 @@ def test_sdk_http_errors_are_sanitized_and_not_retried(sdk, status, code, retrya
     with pytest.raises(ModelCallError) as caught:
         GeminiActionClient(settings()).generate_buyer(buyer_input())
     assert (caught.value.code, caught.value.retryable) == (code, retryable)
+    assert caught.value.provider_status == status
     assert "private_provider_marker" not in str(caught.value)
     assert caught.value.__suppress_context__ is True
     client.models.generate_content.assert_called_once()
@@ -332,6 +334,15 @@ def test_real_sdk_serialization_and_http_transport_without_network(monkeypatch, 
     assert req.headers["x-goog-api-key"] == "fake-test-api-key"
     body = json.loads(req.content)
     assert body["generationConfig"]["responseMimeType"] == "application/json"
+    assert "candidateCount" not in body["generationConfig"]
     assert body["generationConfig"]["responseJsonSchema"] == response_schema()
     assert "fake-test-api-key" not in req.content.decode()
     assert closed == [True]
+
+
+def test_thinking_level_is_explicit_and_applied_to_sdk(sdk):
+    _, client = sdk
+    configured = GeminiSettings(api_key="fake-test-api-key", model="gemini-test-model", thinking_level="low")
+    GeminiActionClient(configured).generate_buyer(buyer_input())
+    config = client.models.generate_content.call_args.kwargs["config"]
+    assert config.thinking_config.thinking_level == types.ThinkingLevel.LOW

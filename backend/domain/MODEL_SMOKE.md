@@ -28,6 +28,10 @@ source files, or chat:
   name, without a `models/` prefix or URL.
 - `GEMINI_TIMEOUT_MS`: optional integer, 1000 through 60000; default 30000.
 - `GEMINI_MAX_OUTPUT_TOKENS`: optional integer, 128 through 4096; default 2048.
+- `GEMINI_THINKING_LEVEL`: optional `low`, `medium`, or `high`; omitted by
+  default, preserving the model's default. Set `low` explicitly for a
+  latency-sensitive Gemini 3.8 action call. Model support must be checked;
+  unsupported settings fail rather than silently changing the request.
 
 The CLI reads only the root repository `.env` if it exists, or exactly the file
 selected by `--env-file`. The settings loader itself never discovers files.
@@ -67,6 +71,8 @@ message. Exit 1 means configuration, input, transport, provider, or action
 validation failed. Argparse uses exit 2 for invalid flags. Success prints only
 model ID, role, and action type. No raw response, private terms, prompt, key, or
 provider error body is printed. Failed calls are never replaced with fixtures.
+Failures include a safe error code and HTTP status when available; these are
+diagnostic metadata, not raw provider messages.
 
 ## Client and wire contract
 
@@ -80,7 +86,9 @@ client's enforcement boundary.
 
 The transport uses the Gemini Developer API at
 `https://generativelanguage.googleapis.com/v1beta`, an explicit API key, a bounded
-SDK HTTP timeout, output-token limit, one candidate, and one attempt. It never
+SDK HTTP timeout, output-token limit, and one attempt. The request omits
+`candidate_count` for Gemini 3+ compatibility; parsing still requires exactly
+one returned candidate. It never
 uses Vertex/Enterprise credentials or tools. An HTTP timeout is not an exact
 end-to-end wall-clock deadline; negotiation-level deadlines remain A2 work.
 

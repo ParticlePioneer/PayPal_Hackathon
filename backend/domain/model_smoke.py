@@ -51,7 +51,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Gemini smoke passed: model={settings.model}; role={args.role}; action={action.type}. "
               "One action parsed; no negotiation, quote, or payment performed.")
         return 0
-    except (ModelConfigurationError, ModelCallError) as exc:
+    except ModelCallError as exc:
+        status = f", http={exc.provider_status}" if exc.provider_status is not None else ""
+        print(f"Gemini smoke failed [code={exc.code}{status}]: {exc}", file=sys.stderr)
+        return 1
+    except ModelConfigurationError as exc:
         print(f"Gemini smoke failed: {exc}", file=sys.stderr)
         return 1
 

@@ -99,3 +99,20 @@ def test_unreadable_and_invalid_encoding_files(tmp_path):
     invalid.write_bytes(b"\xff\xfe")
     with pytest.raises(ModelConfigurationError):
         GeminiSettings.from_environment(env_file=invalid, environ={})
+
+
+@pytest.mark.parametrize("level", ["low", "medium", "high"])
+def test_explicit_thinking_level(level):
+    settings = GeminiSettings.from_environment(environ={
+        "GEMINI_API_KEY": "fake-key", "GEMINI_MODEL": "gemini-test", "GEMINI_THINKING_LEVEL": level,
+    })
+    assert settings.thinking_level == level
+
+
+@pytest.mark.parametrize("level", ["minimal", "LOW", "", "none", "private_marker"])
+def test_invalid_thinking_level_is_not_echoed(level):
+    with pytest.raises(ModelConfigurationError) as caught:
+        GeminiSettings.from_environment(environ={
+            "GEMINI_API_KEY": "fake-key", "GEMINI_MODEL": "gemini-test", "GEMINI_THINKING_LEVEL": level,
+        })
+    assert "private_marker" not in str(caught.value)

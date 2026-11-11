@@ -112,3 +112,12 @@ def test_explicit_env_file_reaches_config_loader(configured, tmp_path):
     path = tmp_path / "local.env"
     assert model_smoke.main(["--env-file", str(path), "--check-config"]) == 0
     loader.assert_called_once_with(env_file=path)
+
+
+def test_safe_provider_status_and_code_in_failure_output(configured, capsys):
+    _, factory = configured
+    factory.return_value.generate_buyer.side_effect = ModelCallError("request_rejected", provider_status=400)
+    assert model_smoke.main([]) == 1
+    out = capsys.readouterr()
+    assert "code=request_rejected, http=400" in out.err
+    assert "private_key_marker" not in out.err and not out.out

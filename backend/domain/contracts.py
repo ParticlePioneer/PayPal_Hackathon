@@ -151,6 +151,8 @@ class SellerPrivateInput(Contract):
     sku: OfferReference
     stock_batches: tuple[SellerStockBatch, ...] = Field(repr=False)
     policy: SellerPolicy = Field(repr=False)
+    # Optional merchant-supplied starting proposals, never shared until offered.
+    offer_options: tuple[OfferTerms, ...] = Field(default=(), repr=False)
 
     @model_validator(mode="after")
     def unique_batches(self) -> Self:
