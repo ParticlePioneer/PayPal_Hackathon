@@ -47,5 +47,28 @@ class OAuthTests(unittest.TestCase):
             self.assertEqual(call.call_args.args[0].full_url, "https://api-m.sandbox.paypal.com/v1/oauth2/token")
 
 
+class DeploymentChecksTests(unittest.TestCase):
+    def test_checks_report_success_without_sensitive_values(self):
+        from backend.payments import b1_checks
+        with patch.object(b1_checks, "check_database"), patch.object(b1_checks, "check_sandbox_auth"), self.assertLogs("uvicorn.error", level="INFO") as logs:
+            b1_checks.run_checks()
+        self.assertEqual(len(logs.output), 2)
+        self.assertTrue(all("PASSED" in line for line in logs.output))
+
+    def test_failure_logs_do_not_expose_exception(self):
+        from backend.payments import b1_checks
+        with patch.object(b1_checks, "check_database", side_effect=RuntimeError("private-db-url")), patch.object(b1_checks, "check_sandbox_auth", side_effect=RuntimeError("private-token")), self.assertLogs("uvicorn.error", level="ERROR") as logs:
+            b1_checks.run_checks()
+        self.assertEqual(len(logs.output), 2)
+        self.assertTrue(all("FAILED" in line for line in logs.output))
+        self.assertNotIn("private", " ".join(logs.output))
+
+    def test_disabled_by_default(self):
+        from backend.payments import b1_checks
+        with patch.dict("os.environ", {}, clear=True), patch.object(b1_checks, "Thread") as thread:
+            b1_checks.start_checks_if_enabled()
+            thread.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
