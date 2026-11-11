@@ -1,0 +1,6 @@
+# Domain runtime contracts; shared backend requirements remain unchanged.
+pydantic>=2.10,<3
+google-genai>=1.75,<2
+python-dotenv>=1.2,<2
+# Explicit because the client classifies HTTPX transport/timeout exceptions.
+httpx>=0.28.1,<1
