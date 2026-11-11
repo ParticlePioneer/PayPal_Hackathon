@@ -51,3 +51,12 @@ def create_order(cents, request_id):
 
 def authorize_order(order_id, request_id):
     return call("/v2/checkout/orders/" + quote(order_id, safe="") + "/authorize", {}, request_id)
+
+
+def capture_authorization(authorization_id, cents, request_id):
+    if type(cents) is not int or cents <= 0:
+        raise ValueError("Invalid amount")
+    amount = f"{cents // 100}.{cents % 100:02d}"
+    payload = {"amount": {"currency_code": "USD", "value": amount}, "final_capture": True}
+    path = "/v2/payments/authorizations/" + quote(authorization_id, safe="") + "/capture"
+    return call(path, payload, request_id)
