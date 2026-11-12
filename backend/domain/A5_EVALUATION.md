@@ -1,5 +1,8 @@
 # A5 reliability and evaluation
 
+Current live evaluation uses OpenRouter; see [OPENROUTER.md](OPENROUTER.md).
+The Gemini runs and commands below are historical and do not describe the current provider.
+
 A5's offline checks exercise the existing negotiation and quote boundaries. They
 do not make Gemini or PayPal calls and do not establish real-model performance.
 The A1/A2 live-model gates were still open at the time of the offline checks;
@@ -32,6 +35,22 @@ Run the development comparison from the repository root:
 ```powershell
 .\.venv\Scripts\python.exe -B -m backend.domain.evaluate --candidate fixture
 ```
+
+To capture live Gemini responses for these synthetic cases, run:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m backend.domain.evaluate --candidate live --env-file .env --response-trace gemini-response-live.jsonl
+```
+
+The optional JSONL trace appends one record per received provider response, with
+the case, role, HTTP status, HTTP version, headers and complete decoded body.
+The configured key and selected sensitive headers are redacted. The trace can
+still contain sensitive provider or generated content; keep it local and review
+it before sharing. Files named `gemini-response-*.jsonl` are gitignored; other
+filenames are not automatically ignored. Use a fresh filename for each run.
+No HTTP record exists when a request times out or fails before a response is
+received. The parent-enforced turn deadline includes process startup. These are
+Gemini provider responses, not the application's HTTP endpoint responses.
 
 The `baseline` is a simple deterministic negotiator; `fixture` is the existing
 deterministic fixture-agent substitute. **Both are simulated**, not AI models.
@@ -92,6 +111,16 @@ with no scripted fallback. Live runs may incur provider usage and may take up to
 the configured per-turn limit for each case. Live performance counts remain
 pending in full. A matching outcome in synthetic evaluation does not prove real seller
 policy approval or payment integration.
+
+## Live response-trace run — November 12, 2026
+
+Using the corrected scenarios and `gemini-3.6-flash`, feasible split,
+impossible deadline, depleted stock, and ordinary order matched their expected
+outcomes. Budget shortfall and forbidden color were incomplete: Gemini returned
+HTTP 503 `UNAVAILABLE` for the seller and buyer respectively, citing high
+demand. The baseline matched all six. The runner made no automatic retries and
+issued no quotes; a 503 is not evidence of a negotiation result. The local
+response trace contains the provider responses for this run.
 
 ## Reliability evidence and limits
 

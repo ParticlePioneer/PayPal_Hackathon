@@ -6,8 +6,8 @@ def create_negotiation_router():
     from backend.domain.api import NegotiationService, create_router
     from backend.domain.contracts import SellerPolicy, SellerPrivateInput
     from backend.domain.database import DomainDatabase
-    from backend.domain.model_client import GeminiActionClient
-    from backend.domain.model_config import GeminiSettings
+    from backend.domain.openrouter_client import OpenRouterActionClient
+    from backend.domain.openrouter_config import Settings as OpenRouterSettings
     from backend.domain.quotes import QuoteAdapter
 
     raw_floor = os.getenv("MERCHANT_MINIMUM_TOTAL_CENTS", "")
@@ -15,9 +15,9 @@ def create_negotiation_router():
         raise RuntimeError("MERCHANT_MINIMUM_TOTAL_CENTS must be explicitly configured as a positive integer")
     floor = int(raw_floor)
     quotes = QuoteAdapter(DomainDatabase.from_environment())
-    settings = GeminiSettings.from_environment()
+    settings = OpenRouterSettings.from_environment()
 
     def seller(requirements):
         return SellerPrivateInput(sku=requirements.sku, policy=SellerPolicy(minimum_total_cents=floor), stock_batches=())
 
-    return create_router(NegotiationService(quotes, seller, GeminiActionClient(settings), timeout_ms=settings.timeout_ms))
+    return create_router(NegotiationService(quotes, seller, OpenRouterActionClient(settings), timeout_ms=settings.timeout_ms))

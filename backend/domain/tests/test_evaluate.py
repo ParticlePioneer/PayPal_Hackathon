@@ -78,7 +78,7 @@ def test_timeout_is_incomplete_not_a_correct_no_deal():
 
 
 def test_fixture_cli_never_reads_model_configuration_or_fakes_live_counts(monkeypatch, capsys):
-    monkeypatch.setattr("backend.domain.evaluate.GeminiSettings.from_environment", lambda **_: pytest.fail("fixture mode loaded credentials"))
+    monkeypatch.setattr("backend.domain.evaluate.OpenRouterSettings.from_environment", lambda **_: pytest.fail("fixture mode loaded credentials"))
     assert main(["--candidate", "fixture"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["candidate_kind"] == "fixture" and len(report["cases"]) == 6

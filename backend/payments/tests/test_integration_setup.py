@@ -11,7 +11,7 @@ class IntegrationSetupTests(unittest.TestCase):
             create_negotiation_router()
 
     def test_builds_domain_router_without_contacting_providers(self):
-        env = {"DATABASE_URL": "postgresql://user:pass@localhost/test", "GEMINI_API_KEY": "test-key", "GEMINI_MODEL": "gemini-3.6-flash", "MERCHANT_MINIMUM_TOTAL_CENTS": "30000"}
+        env = {"DATABASE_URL": "postgresql://user:pass@localhost/test", "OPENROUTER_API_KEY": "test-key", "OPENROUTER_MODEL": "dots-studio/dots-3-note-preview:free", "MERCHANT_MINIMUM_TOTAL_CENTS": "30000"}
         with patch.dict("os.environ", env, clear=True):
             router = create_negotiation_router()
         self.assertIn("/api/negotiations", {route.path for route in router.routes})

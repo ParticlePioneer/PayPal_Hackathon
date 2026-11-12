@@ -18,7 +18,7 @@ def test_real_terminal_mock_mode_with_spawn_and_no_credentials(tmp_path, shortfa
     path.write_text(fixture_scenario(30000, shortfall=shortfall).model_dump_json(), encoding="utf-8")
     import os
     environment = dict(os.environ)
-    for key in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL"):
+    for key in ("OPENROUTER_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL"):
         environment.pop(key, None)
     completed = subprocess.run(
         [sys.executable, "-B", "-m", "backend.domain.negotiate", "--mode", "mock", "--input", str(path)],
@@ -52,8 +52,8 @@ def test_mock_mode_never_loads_credentials_or_constructs_model(tmp_path, monkeyp
     path = tmp_path / "input.json"
     path.write_text(fixture_scenario(30000).model_dump_json(), encoding="utf-8")
     loader, client = MagicMock(), MagicMock()
-    monkeypatch.setattr(negotiate.GeminiSettings, "from_environment", loader)
-    monkeypatch.setattr(negotiate, "GeminiActionClient", client)
+    monkeypatch.setattr(negotiate.OpenRouterSettings, "from_environment", loader)
+    monkeypatch.setattr(negotiate, "OpenRouterActionClient", client)
     # Exercise the CLI's construction path; the integration tests above execute
     # its actual engine and child processes.
     from backend.domain.negotiation import NegotiationResult
@@ -81,15 +81,15 @@ def test_mode_and_input_are_explicit(args):
 
 
 def test_live_failure_stays_live_and_never_uses_fixture_agents(tmp_path, monkeypatch, capsys):
-    from backend.domain.model_config import GeminiSettings
+    from backend.domain.openrouter_config import Settings as OpenRouterSettings
     from backend.domain.negotiation import NegotiationResult
     path = tmp_path / "private-scenario.json"
     path.write_text(fixture_scenario(30000).model_dump_json(), encoding="utf-8")
-    settings = GeminiSettings(api_key="private_fake_key", model="gemini-test")
+    settings = OpenRouterSettings(api_key="private_fake_key", model="dots-studio/dots-3-note-preview:free")
     loader = MagicMock(return_value=settings)
     factory, mock_agents = MagicMock(), MagicMock(side_effect=AssertionError("No mock fallback allowed"))
-    monkeypatch.setattr(negotiate.GeminiSettings, "from_environment", loader)
-    monkeypatch.setattr(negotiate, "GeminiActionClient", factory)
+    monkeypatch.setattr(negotiate.OpenRouterSettings, "from_environment", loader)
+    monkeypatch.setattr(negotiate, "OpenRouterActionClient", factory)
     monkeypatch.setattr(negotiate, "FixtureAgents", mock_agents)
     def failed(scenario, source, limits):
         assert source is factory.return_value
@@ -111,11 +111,11 @@ def test_missing_live_configuration_stops_before_model_construction(tmp_path, mo
     from backend.domain.model_config import ModelConfigurationError
     path = tmp_path / "private-scenario.json"
     path.write_text(fixture_scenario(30000).model_dump_json(), encoding="utf-8")
-    loader = MagicMock(side_effect=ModelConfigurationError("GEMINI_API_KEY is required."))
+    loader = MagicMock(side_effect=ModelConfigurationError("OPENROUTER_API_KEY is required."))
     factory = MagicMock()
-    monkeypatch.setattr(negotiate.GeminiSettings, "from_environment", loader)
-    monkeypatch.setattr(negotiate, "GeminiActionClient", factory)
+    monkeypatch.setattr(negotiate.OpenRouterSettings, "from_environment", loader)
+    monkeypatch.setattr(negotiate, "OpenRouterActionClient", factory)
     assert negotiate.main(["--mode", "live", "--input", str(path)]) == 1
     factory.assert_not_called()
     captured = capsys.readouterr()
-    assert not captured.out and "GEMINI_API_KEY" in captured.err
+    assert not captured.out and "OPENROUTER_API_KEY" in captured.err

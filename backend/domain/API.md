@@ -1,7 +1,7 @@
 # A4 negotiation API and handoff
 
 The domain router is importable through `backend.domain.api.create_router`.
-It is not mounted into Member B's application automatically. The host constructs
+The integrated host mounts it when `B4_ENABLED=true`; alternatively a host constructs
 `NegotiationService(quote_adapter, seller_factory, agent_source)` and mounts
 `create_router(service)` in its own FastAPI application. The service and A3
 adapter must use the same configured PostgreSQL database. Install
@@ -19,7 +19,8 @@ The seller factory receives validated buyer requirements and must return a
 trusted `SellerPrivateInput` with merchant policy and optional offer options.
 The service replaces its stock batches with current A3 availability. There is
 no default seller floor. `agent_source` must supply `generate_buyer` and
-`generate_seller`; use the configured Gemini client for a live deployment.
+`generate_seller`; construct `OpenRouterActionClient(Settings.from_environment(...))`
+for a live deployment. See [OPENROUTER.md](OPENROUTER.md).
 The synthetic fixture agents are exclusively for clearly labeled testing.
 
 ## HTTP contract

@@ -7,18 +7,19 @@ import pytest
 from backend.domain import model_smoke
 from backend.domain.contracts import AskAction
 from backend.domain.model_client import ModelCallError
-from backend.domain.model_config import GeminiSettings, ModelConfigurationError
+from backend.domain.openrouter_config import Settings as OpenRouterSettings
+from backend.domain.model_config import ModelConfigurationError
 
 
 @pytest.fixture
 def configured(monkeypatch):
-    config = GeminiSettings(api_key="private_key_marker", model="gemini-test-model")
+    config = OpenRouterSettings(api_key="private_key_marker", model="dots-studio/dots-3-note-preview:free")
     loader = MagicMock(return_value=config)
     factory = MagicMock()
     factory.return_value.generate_buyer.return_value = AskAction(type="ask", topic="delivery_options")
     factory.return_value.generate_seller.return_value = AskAction(type="ask", topic="revised_offer")
-    monkeypatch.setattr(model_smoke.GeminiSettings, "from_environment", loader)
-    monkeypatch.setattr(model_smoke, "GeminiActionClient", factory)
+    monkeypatch.setattr(model_smoke.OpenRouterSettings, "from_environment", loader)
+    monkeypatch.setattr(model_smoke, "OpenRouterActionClient", factory)
     return loader, factory
 
 
@@ -45,11 +46,11 @@ def test_default_smoke_one_buyer_call_no_private_output(configured, capsys):
 
 def test_missing_configuration_never_constructs_client(configured, capsys):
     loader, factory = configured
-    loader.side_effect = ModelConfigurationError("GEMINI_API_KEY is required.")
+    loader.side_effect = ModelConfigurationError("OPENROUTER_API_KEY is required.")
     assert model_smoke.main([]) == 1
     factory.assert_not_called()
     out = capsys.readouterr()
-    assert not out.out and "GEMINI_API_KEY" in out.err and "smoke passed" not in out.err
+    assert not out.out and "OPENROUTER_API_KEY" in out.err and "smoke passed" not in out.err
 
 
 def test_model_failure_is_not_reported_as_success(configured, capsys):

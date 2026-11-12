@@ -8,8 +8,10 @@ from pydantic import ValidationError
 
 from .contracts import BuyerAgentInput, SellerAgentInput, SharedNegotiationContext
 from .fixtures import buyer_fixture
-from .model_client import GeminiActionClient, ModelCallError, MAX_INPUT_BYTES
-from .model_config import GeminiSettings, ModelConfigurationError
+from .model_client import ModelCallError, MAX_INPUT_BYTES
+from .model_config import ModelConfigurationError
+from .openrouter_client import OpenRouterActionClient
+from .openrouter_config import Settings as OpenRouterSettings
 
 
 def _agent_input(role: str, input_file: Path | None):
@@ -30,7 +32,7 @@ def _agent_input(role: str, input_file: Path | None):
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Gemini single-action smoke check; never performs negotiation or payment.")
+    parser = argparse.ArgumentParser(description="OpenRouter single-action smoke check; never performs negotiation or payment.")
     parser.add_argument("--env-file", type=Path, help="Explicit dotenv file; otherwise reads repository .env only if it exists.")
     parser.add_argument("--role", choices=("buyer", "seller"), default="buyer")
     parser.add_argument("--input", type=Path, help="Private JSON matching the selected role's agent-input contract.")
@@ -41,22 +43,22 @@ def main(argv: list[str] | None = None) -> int:
         if env_file is None:
             candidate = Path(__file__).resolve().parents[2] / ".env"
             env_file = candidate if candidate.exists() else None
-        settings = GeminiSettings.from_environment(env_file=env_file)
+        settings = OpenRouterSettings.from_environment(env_file=env_file)
         if args.check_config:
-            print(f"Gemini configuration valid: model={settings.model}. Credentials were not verified; no request sent.")
+            print(f"OpenRouter configuration valid: model={settings.model}. Credentials were not verified; no request sent.")
             return 0
         agent_input = _agent_input(args.role, args.input)
-        client = GeminiActionClient(settings)
+        client = OpenRouterActionClient(settings)
         action = client.generate_buyer(agent_input) if args.role == "buyer" else client.generate_seller(agent_input)
-        print(f"Gemini smoke passed: model={settings.model}; role={args.role}; action={action.type}. "
+        print(f"OpenRouter smoke passed: model={settings.model}; role={args.role}; action={action.type}. "
               "One action parsed; no negotiation, quote, or payment performed.")
         return 0
     except ModelCallError as exc:
         status = f", http={exc.provider_status}" if exc.provider_status is not None else ""
-        print(f"Gemini smoke failed [code={exc.code}{status}]: {exc}", file=sys.stderr)
+        print(f"OpenRouter smoke failed [code={exc.code}{status}]: {exc}", file=sys.stderr)
         return 1
     except ModelConfigurationError as exc:
-        print(f"Gemini smoke failed: {exc}", file=sys.stderr)
+        print(f"OpenRouter smoke failed: {exc}", file=sys.stderr)
         return 1
 
 

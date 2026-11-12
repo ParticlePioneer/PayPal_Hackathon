@@ -26,10 +26,13 @@ coverage/
 *.tsbuildinfo
 
 # Local databases, logs and temporary files
+experiments/
 *.sqlite
 *.sqlite3
 *.db
 *.log
+gemini-response-*.jsonl
+openrouter-response-*.jsonl
 *.tmp
 
 # Editors and operating systems

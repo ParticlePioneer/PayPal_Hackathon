@@ -17,8 +17,14 @@ services:
         sync: false
       - key: PAYPAL_CLIENT_SECRET
         sync: false
-      - key: GEMINI_API_KEY
+      - key: OPENROUTER_API_KEY
         sync: false
+      - key: OPENROUTER_MODEL
+        value: dots-studio/dots-3-note-preview:free
+      - key: OPENROUTER_TIMEOUT_MS
+        value: '30000'
+      - key: OPENROUTER_MAX_OUTPUT_TOKENS
+        value: '4096'
 
 databases:
   - name: agentnegotiate-db

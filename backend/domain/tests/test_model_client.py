@@ -11,7 +11,8 @@ import pytest
 
 from backend.domain.contracts import (
     ACTION_ADAPTER, BuyerAgentInput, SellerAgentInput,
-    SellerPolicy, SellerPrivateInput, SellerStockBatch, SharedNegotiationContext,
+    OfferAction, PublicEvent, SellerPolicy, SellerPrivateInput, SellerStockBatch,
+    SharedNegotiationContext,
 )
 from backend.domain.fixtures import buyer_fixture, split_offer_fixture
 from backend.domain.model_client import (
@@ -130,6 +131,38 @@ def test_role_calls_do_not_reuse_another_roles_history(sdk):
     first, second = [call.kwargs["contents"] for call in client.models.generate_content.call_args_list]
     assert "budget_cents" in first and "budget_cents" not in second
     assert "minimum_total_cents" in second and "minimum_total_cents" not in first
+
+
+def test_seller_receives_active_offer_and_private_option_for_counter(sdk):
+    _, client = sdk
+    option = split_offer_fixture()
+    buyer_offer = option.model_copy(update={"total_cents": 30000})
+    event = PublicEvent(event_id="e1", sequence=1, actor="buyer",
+                        action=OfferAction(type="offer", terms=buyer_offer), issued_offer_id="o1")
+    original = seller_input()
+    data = SellerAgentInput(
+        private=original.private.model_copy(update={"offer_options": (option,)}),
+        shared=SharedNegotiationContext(requirements=original.shared.requirements, events=(event,)),
+    )
+    client.models.generate_content.return_value = response(json.dumps({"action": {
+        "type": "counter", "offer_id": "o1", "terms": option.model_dump(mode="json")}}))
+
+    result = GeminiActionClient(settings()).generate_seller(data)
+    request = client.models.generate_content.call_args.kwargs
+    payload = json.loads(request["contents"])["input"]
+    assert payload["shared"]["events"][0]["issued_offer_id"] == "o1"
+    assert payload["private"]["offer_options"][0] == option.model_dump(mode="json")
+    assert "budget_cents" not in request["contents"]
+    assert "counter the active buyer offer" in request["config"].system_instruction
+    assert result.type == "counter" and result.offer_id == "o1" and result.terms == option
+
+
+def test_buyer_guidance_allows_nonpreferred_allowed_color(sdk):
+    _, client = sdk
+    GeminiActionClient(settings()).generate_buyer(buyer_input())
+    instruction = client.models.generate_content.call_args.kwargs["config"].system_instruction
+    assert "other allowed colors and split deliveries are acceptable" in instruction
+    assert "counter the active buyer offer" not in instruction
 
 
 @pytest.mark.parametrize("role,invalid", [
@@ -346,3 +379,30 @@ def test_thinking_level_is_explicit_and_applied_to_sdk(sdk):
     GeminiActionClient(configured).generate_buyer(buyer_input())
     config = client.models.generate_content.call_args.kwargs["config"]
     assert config.thinking_config.thinking_level == types.ThinkingLevel.LOW
+
+
+@pytest.mark.parametrize("status", [200, 429])
+def test_opt_in_http_trace_records_success_and_error(monkeypatch, tmp_path, status):
+    real_client = genai.Client
+    body = response_body() if status == 200 else {"error": {"code": 429, "message": "quota fake-test-api-key"}}
+    transport = httpx.MockTransport(lambda request: httpx.Response(status, json=body, headers={"set-cookie": "secret"}))
+
+    def factory(**kwargs):
+        options = kwargs["http_options"]
+        client_args = {**options.client_args, "transport": transport, "trust_env": False}
+        return real_client(**{**kwargs, "http_options": options.model_copy(update={"client_args": client_args})})
+
+    monkeypatch.setattr("backend.domain.model_client.genai.Client", factory)
+    path = tmp_path / "trace.jsonl"
+    client = GeminiActionClient(settings(), response_trace=path)
+    client.trace_case = "test_case"
+    if status == 200:
+        client.generate_buyer(buyer_input())
+    else:
+        with pytest.raises(ModelCallError):
+            client.generate_buyer(buyer_input())
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert (record["case"], record["role"], record["status_code"]) == ("test_case", "buyer", status)
+    assert record["headers"]["set-cookie"] == "[REDACTED]"
+    assert "fake-test-api-key" not in path.read_text(encoding="utf-8")
+    assert json.loads(record["body"])["error"]["code"] == 429 if status == 429 else json.loads(record["body"]) == body

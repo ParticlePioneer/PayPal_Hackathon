@@ -3,7 +3,8 @@
 Implement negotiation, inventory, reservations, quote lifecycle, the domain router, and the server-side quote adapter here. The API and adapter contracts are in `implementation_plan.md`. Keep domain migrations in `migrations/`; coordinate integration with member B.
 
 Implemented contract documentation: [CONTRACTS.md](CONTRACTS.md).
-Model configuration and smoke command: [MODEL_SMOKE.md](MODEL_SMOKE.md).
+Current OpenRouter configuration, smoke command and evaluation: [OPENROUTER.md](OPENROUTER.md).
+The older [MODEL_SMOKE.md](MODEL_SMOKE.md) describes the historical Gemini implementation.
 The authorized offline A2 runner and its limitations: [NEGOTIATION.md](NEGOTIATION.md).
 The real-model gate remains pending; no stock reservation, quote, API, or payment
 integration is provided by the terminal runner.
