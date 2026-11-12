@@ -36,21 +36,21 @@ Run the development comparison from the repository root:
 .\.venv\Scripts\python.exe -B -m backend.domain.evaluate --candidate fixture
 ```
 
-To capture live Gemini responses for these synthetic cases, run:
+To capture live OpenRouter responses for these synthetic cases, run:
 
 ```powershell
-.\.venv\Scripts\python.exe -B -m backend.domain.evaluate --candidate live --env-file .env --response-trace gemini-response-live.jsonl
+.\.venv\Scripts\python.exe -B -m backend.domain.evaluate --candidate live --env-file .env --response-trace openrouter-response-live.jsonl
 ```
 
 The optional JSONL trace appends one record per received provider response, with
 the case, role, HTTP status, HTTP version, headers and complete decoded body.
 The configured key and selected sensitive headers are redacted. The trace can
 still contain sensitive provider or generated content; keep it local and review
-it before sharing. Files named `gemini-response-*.jsonl` are gitignored; other
+it before sharing. Files named `openrouter-response-*.jsonl` are gitignored; other
 filenames are not automatically ignored. Use a fresh filename for each run.
 No HTTP record exists when a request times out or fails before a response is
 received. The parent-enforced turn deadline includes process startup. These are
-Gemini provider responses, not the application's HTTP endpoint responses.
+OpenRouter provider responses, not the application's HTTP endpoint responses.
 
 The `baseline` is a simple deterministic negotiator; `fixture` is the existing
 deterministic fixture-agent substitute. **Both are simulated**, not AI models.
@@ -121,6 +121,23 @@ HTTP 503 `UNAVAILABLE` for the seller and buyer respectively, citing high
 demand. The baseline matched all six. The runner made no automatic retries and
 issued no quotes; a 503 is not evidence of a negotiation result. The local
 response trace contains the provider responses for this run.
+
+## Current OpenRouter comparison — November 12, 2026
+
+At code commit `c9f1807`, the configured `dots-studio/dots-3-note-preview:free`
+model was compared against the scripted baseline with a 30-second per-turn
+limit and 4096 output tokens. The baseline matched six synthetic cases. The live
+model matched feasible split, budget shortfall, depleted stock and ordinary
+order. Impossible deadline and forbidden color timed out and were incomplete;
+neither is counted as a match. No quote was issued. The 30-second boundary
+includes process startup and provider time. These are local results, not
+deployed or merchant-policy evidence.
+
+A separately executed 45-second diagnostic at the same code commit matched
+five cases; impossible deadline timed out on turn two. Forbidden color reached
+the six-turn limit with four ineligible proposals and no deal. The baseline
+matched all six. This different timeout was diagnostic only, left the release
+default unchanged, and does not make either six-case run complete.
 
 ## Reliability evidence and limits
 
