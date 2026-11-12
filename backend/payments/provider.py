@@ -12,8 +12,8 @@ class ProviderError(Exception):
     """The provider outcome may be unknown."""
 
 
-def request(path, data, headers):
-    req = Request(BASE + path, data=data, headers=headers, method="POST")
+def request(path, data, headers, *, method="POST"):
+    req = Request(BASE + path, data=data, headers=headers, method=method)
     try:
         with urlopen(req, timeout=20) as response:
             result = json.load(response)
@@ -60,3 +60,19 @@ def capture_authorization(authorization_id, cents, request_id):
     payload = {"amount": {"currency_code": "USD", "value": amount}, "final_capture": True}
     path = "/v2/payments/authorizations/" + quote(authorization_id, safe="") + "/capture"
     return call(path, payload, request_id)
+
+
+def get_resource(path):
+    return request(path, None, {"Authorization": "Bearer " + token()}, method="GET")
+
+
+def get_order(order_id):
+    return get_resource("/v2/checkout/orders/" + quote(order_id, safe=""))
+
+
+def get_authorization(authorization_id):
+    return get_resource("/v2/payments/authorizations/" + quote(authorization_id, safe=""))
+
+
+def get_capture(capture_id):
+    return get_resource("/v2/payments/captures/" + quote(capture_id, safe=""))

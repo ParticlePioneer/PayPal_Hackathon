@@ -35,3 +35,10 @@ class DomainHandoffTests(unittest.TestCase):
         with patch.object(provider, "authorize_order", return_value=self.response), self.assertRaises(PaymentUncertain):
             authorize_reserved_quote(self.quotes, "session", "quote", "operation", "order")
         self.quotes.release_claim.assert_not_called()
+
+    def test_verified_id_is_saved_before_allocation(self):
+        events = []
+        self.quotes.commit_allocation.side_effect = lambda _: events.append("allocation")
+        with patch.object(provider, "authorize_order", return_value=self.response):
+            authorize_reserved_quote(self.quotes, "session", "quote", "operation", "order", on_verified=lambda value: events.append(value))
+        self.assertEqual(events, ["auth", "allocation"])

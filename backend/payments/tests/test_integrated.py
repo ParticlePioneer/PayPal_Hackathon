@@ -1,5 +1,5 @@
 import unittest
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -11,6 +11,12 @@ from backend.payments.domain_handoff import PaymentUncertain, authorize_reserved
 
 class IntegratedPaymentTests(unittest.TestCase):
     def setUp(self):
+        self.lock_patch = patch.object(integrated, "payment_lock", lambda _: nullcontext())
+        self.lock_patch.start()
+        self.addCleanup(self.lock_patch.stop)
+        self.order_patch = patch.object(integrated, "order_quote", return_value="q1")
+        self.order_patch.start()
+        self.addCleanup(self.order_patch.stop)
         self.request = SimpleNamespace(state=SimpleNamespace(session_id="s_buyer"), headers={"origin": "https://example.test", "host": "example.test"})
         self.quote = SimpleNamespace(id="q1", state="reserved", total_cents=35400, currency="USD")
         self.quotes = MagicMock()
@@ -70,7 +76,19 @@ class IntegratedPaymentTests(unittest.TestCase):
         with patch.dict("os.environ", {"B4_MERCHANT_TOKEN": "x" * 40}, clear=True), patch.object(integrated, "database", self.database), patch.object(integrated, "adapter", return_value=self.quotes), patch.object(integrated, "authorize_reserved_quote", return_value=result) as call:
             response = integrated.reconcile("q1", "authorize", "Bearer " + "x" * 40)
         self.assertEqual(response["authorization_id"], "auth1")
-        call.assert_called_once_with(self.quotes, "s_buyer", "q1", "old-operation", "order", expected_cents=35400)
+        self.assertEqual(call.call_args.args, (self.quotes, "s_buyer", "q1", "old-operation", "order"))
+        self.assertEqual(call.call_args.kwargs["expected_cents"], 35400)
+        self.assertTrue(callable(call.call_args.kwargs["on_verified"]))
+
+    def test_reconciliation_with_saved_authorization_finishes_allocation_without_replay(self):
+        row = {"operation_id": "old-operation", "status": "unknown", "retry_allowed": True, "recovery_ready": True, "session_id": "s_buyer", "paypal_order_id": "order", "paypal_authorization_id": "auth-saved", "amount_cents": 35400}
+        self.connection.execute.side_effect = [MagicMock(), MagicMock(fetchone=MagicMock(return_value=row)), MagicMock()]
+        with patch.dict("os.environ", {"B4_MERCHANT_TOKEN": "x" * 40}, clear=True), patch.object(integrated, "database", self.database), patch.object(integrated, "adapter", return_value=self.quotes), patch.object(provider, "authorize_order") as call:
+            result = integrated.reconcile("q1", "authorize", "Bearer " + "x" * 40)
+        self.assertEqual(result["authorization_id"], "auth-saved")
+        self.quotes.claim_for_authorization.assert_called_once_with("s_buyer", "q1", "old-operation")
+        self.quotes.commit_allocation.assert_called_once_with("old-operation")
+        call.assert_not_called()
 
     def test_reconciliation_rejects_old_uncertain_operation(self):
         row = {"status": "unknown", "retry_allowed": False, "recovery_ready": True}

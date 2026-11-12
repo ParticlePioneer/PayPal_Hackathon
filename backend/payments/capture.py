@@ -7,11 +7,22 @@ import os
 from uuid import uuid4
 
 from fastapi import APIRouter, Header, HTTPException
+from pydantic import BaseModel, StrictBool
 
 from . import provider
 from .harness import database, require_harness
 
 router = APIRouter()
+
+
+class FulfillmentRequest(BaseModel):
+    simulated: StrictBool
+
+
+@router.post("/api/merchant/payments/authorizations/{authorization_id}/fulfillment")
+def fulfillment(authorization_id: str, body: FulfillmentRequest, authorization: str | None = Header(default=None)):
+    from .integrated_capture import fulfill
+    return fulfill(authorization_id, authorization, body.simulated)
 
 
 def require_merchant(authorization: str | None):
@@ -28,7 +39,10 @@ def require_merchant(authorization: str | None):
 
 
 @router.post("/api/merchant/payments/authorizations/{authorization_id}/capture")
-def capture(authorization_id: str, authorization: str | None = Header(default=None), x_b3_simulate_lost_response: str | None = Header(default=None)):
+def capture(authorization_id: str, authorization: str | None = Header(default=None), x_b3_simulate_lost_response: str | None = Header(default=None), x_b5_simulate_lost_response: str | None = Header(default=None)):
+    if os.getenv("B4_ENABLED", "").lower() == "true":
+        from .integrated_capture import capture as integrated_capture
+        return integrated_capture(authorization_id, authorization, x_b5_simulate_lost_response)
     require_merchant(authorization)
     with database() as conn:
         auth = conn.execute(

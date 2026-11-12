@@ -3,6 +3,16 @@ from unittest.mock import patch
 from backend.payments import provider
 
 class ProviderTests(unittest.TestCase):
+    def test_provider_reads_escape_identifiers(self):
+        with patch.object(provider, "get_resource", return_value={}) as get:
+            provider.get_order("order/one")
+            provider.get_authorization("auth/one")
+            provider.get_capture("capture/one")
+        self.assertEqual([call.args[0] for call in get.call_args_list], [
+            "/v2/checkout/orders/order%2Fone",
+            "/v2/payments/authorizations/auth%2Fone",
+            "/v2/payments/captures/capture%2Fone",
+        ])
     def test_create_order_uses_server_amount_and_authorize_intent(self):
         with patch.object(provider, "call", return_value={"id": "order"}) as call:
             self.assertEqual(provider.create_order(100, "operation"), {"id": "order"})

@@ -40,6 +40,10 @@ services:
         value: 'false'
       - key: B3_ALLOW_FAULT_INJECTION
         value: 'false'
+      - key: B5_CAPTURE_ENABLED
+        value: 'false'
+      - key: B5_ALLOW_FAULT_INJECTION
+        value: 'false'
 
 databases:
   - name: agentnegotiate-db
