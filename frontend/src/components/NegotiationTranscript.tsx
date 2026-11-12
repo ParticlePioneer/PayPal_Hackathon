@@ -100,7 +100,9 @@ export default function NegotiationTranscript({
               {view.version} of 6 turns used
               {activeAgent
                 ? ` · ${activeAgent} agent next`
-                : ` · ${view.status.replace("_", " ")}`}
+                : ` · ${view.status
+                    .replace("_", " ")
+                    .replace(/^\w/, (letter) => letter.toUpperCase())}`}
             </span>
           </div>
           <ol className="turn-progress-track">
