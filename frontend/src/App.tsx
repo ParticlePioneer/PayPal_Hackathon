@@ -532,7 +532,8 @@ export default function App() {
       if (!view) return "Waiting for order";
       if (view.status === "negotiating") return `Turn ${view.version} of 6`;
       if (view.status === "retryable_error") return "Retry available";
-      return view.status.replace("_", " ");
+      const status = view.status.replace("_", " ");
+      return status.charAt(0).toUpperCase() + status.slice(1);
     }
     if (panel === "quote") {
       if (view?.status === "quoted" && view.quote) return "Stock reserved";
