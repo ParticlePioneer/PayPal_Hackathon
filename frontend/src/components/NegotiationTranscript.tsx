@@ -78,7 +78,10 @@ export default function NegotiationTranscript({
             <span className="meta-version">
               Turn Version: <strong>{view.version} / 6</strong>
             </span>
-            <span className={`status-badge status-${view.status}`}>
+            <span
+              key={view.status}
+              className={`status-badge status-${view.status}`}
+            >
               Status: {view.status.toUpperCase()}
             </span>
           </div>
@@ -110,9 +113,17 @@ export default function NegotiationTranscript({
                   key={index}
                   className={`turn-progress-step ${
                     isComplete ? "step-complete" : ""
-                  } ${isActive ? "step-active" : ""}`}
+                  } ${isActive ? "step-active" : ""} ${
+                    busy && isActive ? "step-working" : ""
+                  }`}
                   aria-label={`Turn ${index + 1}: ${agent}${
-                    isComplete ? ", completed" : isActive ? ", next" : ", upcoming"
+                    isComplete
+                      ? ", completed"
+                      : busy && isActive
+                      ? ", working"
+                      : isActive
+                      ? ", next"
+                      : ", upcoming"
                   }`}
                   aria-current={isActive ? "step" : undefined}
                 >
