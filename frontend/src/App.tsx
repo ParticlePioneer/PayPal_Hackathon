@@ -457,6 +457,26 @@ export default function App() {
     );
   }
 
+  function handleLoadPreset(request: CreateNegotiationRequest) {
+    if (inFlightRef.current) return;
+    const nextScenarioId =
+      mode === "fixture" ? scenarioId ?? "feasible_split" : scenarioId;
+    setActiveRequest(request);
+    setScenarioId(nextScenarioId);
+    setView(null);
+    setErrorBanner(null);
+    setActivePanel("order");
+    syncUrlAndStorage(
+      {
+        mode,
+        scenarioId: nextScenarioId,
+        negotiationId: null,
+        lastRequest: request,
+      },
+      true
+    );
+  }
+
   function handleGuideScenario(nextScenario: FixtureScenarioId) {
     if (inFlightRef.current) return;
     handleScenarioChange(nextScenario, "fixture");
@@ -717,7 +737,7 @@ export default function App() {
               canStartNegotiation={mode !== "fixture" || scenarioId !== null}
               hasActiveNegotiation={view !== null}
               onStartNegotiation={(payload) => void handleStartNegotiation(payload)}
-              onLoadPreset={(preset) => setActiveRequest(preset)}
+              onLoadPreset={handleLoadPreset}
             />
           </section>
 

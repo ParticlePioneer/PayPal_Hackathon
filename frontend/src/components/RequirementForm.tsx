@@ -412,7 +412,10 @@ export default function RequirementForm({
             />
           </div>
           <div className="preview-facts">
-            <span>
+            <span
+              key={`${scheduledQuantity}-${quantity}`}
+              className="preview-scheduled-count"
+            >
               <strong>
                 {Math.max(0, scheduledQuantity)} / {Math.max(0, quantity)}
               </strong>{" "}

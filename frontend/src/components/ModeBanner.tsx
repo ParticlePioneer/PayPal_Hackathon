@@ -165,14 +165,14 @@ export default function ModeBanner({
             </div>
 
             {activeScenario ? (
-              <p className="scenario-meta-text">
+              <p className="scenario-meta-text" key={scenarioId}>
                 <strong>Scenario Goal:</strong> {activeScenario.description}{" "}
                 <span className="scenario-expected">
                   ({activeScenario.expectedOutcomeText})
                 </span>
               </p>
             ) : (
-              <p className="scenario-meta-text">
+              <p className="scenario-meta-text" key="no-scenario">
                 Choose a scenario to load its fixture and start a negotiation.
               </p>
             )}
