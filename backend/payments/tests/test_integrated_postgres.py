@@ -2,6 +2,7 @@
 import os
 import json
 import unittest
+from datetime import timedelta
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -69,6 +70,25 @@ class IntegratedPostgresTests(unittest.TestCase):
                 integrated.create_order(self.quote.id, other)
         self.assertEqual(error.exception.status_code, 404)
         create.assert_not_called()
+
+    def test_expired_quote_blocks_approval_and_new_order_without_provider_calls(self):
+        """Advance only the domain clock; never alter frozen quote terms."""
+        with patch.object(integrated, "database", self.db.transaction), patch.object(integrated, "adapter", return_value=self.quotes), patch.object(provider, "create_order", return_value={"id": "order-expiry"}) as create, patch.object(provider, "authorize_order") as authorize:
+            integrated.create_order(self.quote.id, self.request)
+            with patch("backend.domain.quotes._now", return_value=self.quote.expires_at + timedelta(seconds=1)):
+                with self.assertRaises(HTTPException) as first:
+                    integrated.authorize("order-expiry", self.request)
+                with self.assertRaises(HTTPException) as second:
+                    integrated.create_order(self.quote.id, self.request)
+            self.assertEqual(first.exception.status_code, 410)
+            self.assertEqual(second.exception.status_code, 410)
+            authorize.assert_not_called()
+            self.assertEqual(create.call_count, 1)
+            with self.db.transaction() as conn:
+                batches = conn.execute("SELECT reserved_qty, allocated_qty FROM domain_stock_batches").fetchall()
+                claim_count = conn.execute("SELECT count(*) AS n FROM domain_authorization_claims").fetchone()["n"]
+            self.assertTrue(all(row["reserved_qty"] == 0 and row["allocated_qty"] == 0 for row in batches))
+            self.assertEqual(claim_count, 0)
 
     def test_unknown_authorization_keeps_claim_and_blocks_replay(self):
         with patch.object(integrated, "database", self.db.transaction), patch.object(integrated, "adapter", return_value=self.quotes), patch.object(provider, "create_order", return_value={"id": "order-1"}), patch.object(provider, "authorize_order", side_effect=provider.ProviderError("timeout")) as authorize:
