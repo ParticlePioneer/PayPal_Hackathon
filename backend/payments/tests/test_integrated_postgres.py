@@ -2,6 +2,7 @@
 import os
 import json
 import unittest
+from datetime import timedelta
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -17,11 +18,11 @@ from fastapi.testclient import TestClient
 from backend.main import create_app
 from backend.domain.fixtures import split_offer_fixture
 from backend.domain import negotiation
-from backend.domain.database import DomainDatabase
+from backend.domain.database import DomainDatabase, DomainError
 from backend.domain.migrate import apply_migrations
 from backend.domain.negotiation_fixtures import FixtureAgents, fixture_scenario
 from backend.domain.quotes import QuoteAdapter
-from backend.payments import integrated, provider
+from backend.payments import integrated, integrated_capture, provider
 
 
 @unittest.skipUnless(os.getenv("TEST_DATABASE_URL"), "TEST_DATABASE_URL is required for PostgreSQL integration")
@@ -35,7 +36,7 @@ class IntegratedPostgresTests(unittest.TestCase):
         self.db = DomainDatabase(self.dsn, schema=self.schema)
         apply_migrations(self.db)
         with self.db.transaction() as conn:
-            for filename in ("001_payments.sql", "002_b2_harness.sql"):
+            for filename in ("001_payments.sql", "002_b2_harness.sql", "003_b5_fulfillment.sql"):
                 script = (Path(__file__).parents[1] / "migrations" / filename).read_text(encoding="utf-8-sig")
                 conn.execute(script, prepare=False)
         self.quotes = QuoteAdapter(self.db)
@@ -69,6 +70,25 @@ class IntegratedPostgresTests(unittest.TestCase):
                 integrated.create_order(self.quote.id, other)
         self.assertEqual(error.exception.status_code, 404)
         create.assert_not_called()
+
+    def test_expired_quote_blocks_approval_and_new_order_without_provider_calls(self):
+        """Advance only the domain clock; never alter frozen quote terms."""
+        with patch.object(integrated, "database", self.db.transaction), patch.object(integrated, "adapter", return_value=self.quotes), patch.object(provider, "create_order", return_value={"id": "order-expiry"}) as create, patch.object(provider, "authorize_order") as authorize:
+            integrated.create_order(self.quote.id, self.request)
+            with patch("backend.domain.quotes._now", return_value=self.quote.expires_at + timedelta(seconds=1)):
+                with self.assertRaises(HTTPException) as first:
+                    integrated.authorize("order-expiry", self.request)
+                with self.assertRaises(HTTPException) as second:
+                    integrated.create_order(self.quote.id, self.request)
+            self.assertEqual(first.exception.status_code, 410)
+            self.assertEqual(second.exception.status_code, 410)
+            authorize.assert_not_called()
+            self.assertEqual(create.call_count, 1)
+            with self.db.transaction() as conn:
+                batches = conn.execute("SELECT reserved_qty, allocated_qty FROM domain_stock_batches").fetchall()
+                claim_count = conn.execute("SELECT count(*) AS n FROM domain_authorization_claims").fetchone()["n"]
+            self.assertTrue(all(row["reserved_qty"] == 0 and row["allocated_qty"] == 0 for row in batches))
+            self.assertEqual(claim_count, 0)
 
     def test_unknown_authorization_keeps_claim_and_blocks_replay(self):
         with patch.object(integrated, "database", self.db.transaction), patch.object(integrated, "adapter", return_value=self.quotes), patch.object(provider, "create_order", return_value={"id": "order-1"}), patch.object(provider, "authorize_order", side_effect=provider.ProviderError("timeout")) as authorize:
@@ -205,6 +225,83 @@ class IntegratedPostgresTests(unittest.TestCase):
             with self.db.transaction() as conn:
                 self.assertEqual(conn.execute("SELECT count(*) AS n FROM payment_operations").fetchone()["n"], 0)
                 self.assertEqual(conn.execute("SELECT count(*) AS n FROM domain_quotes WHERE state <> 'released'").fetchone()["n"], 0)
+
+    def test_b5_fulfillment_capture_retry_and_persistence(self):
+        reply = {"purchase_units": [{"payments": {"authorizations": [{"id": "auth-b5", "status": "CREATED", "amount": {"currency_code": "USD", "value": "354.00"}}]}}]}
+        capture_reply = {"id": "capture-b5", "status": "COMPLETED", "amount": {"currency_code": "USD", "value": "354.00"}}
+        env = {"B4_ENABLED": "true", "B5_CAPTURE_ENABLED": "true", "B5_ALLOW_FAULT_INJECTION": "true", "B4_MERCHANT_TOKEN": "x" * 40, "SESSION_SECRET": "s" * 40}
+        merchant = "Bearer " + "x" * 40
+        with patch.dict(os.environ, env, clear=True), patch.object(integrated, "database", self.db.transaction), patch.object(integrated, "adapter", return_value=self.quotes), patch.object(integrated_capture, "database", self.db.transaction), patch.object(provider, "create_order", return_value={"id": "order-b5"}), patch.object(provider, "authorize_order", return_value=reply), patch.object(provider, "capture_authorization", return_value=capture_reply) as capture:
+            integrated.create_order(self.quote.id, self.request)
+            integrated.authorize("order-b5", self.request)
+            with self.assertRaises(HTTPException) as error:
+                integrated_capture.capture("auth-b5", merchant, None)
+            self.assertEqual(error.exception.status_code, 409)
+            capture.assert_not_called()
+            self.assertEqual(integrated_capture.fulfill("auth-b5", merchant, True)["status"], "fulfilled")
+            self.assertEqual(integrated_capture.fulfill("auth-b5", merchant, True)["status"], "fulfilled")
+            with self.assertRaises(HTTPException) as error:
+                integrated_capture.capture("auth-b5", merchant, "true")
+            self.assertEqual(error.exception.status_code, 503)
+            first = integrated_capture.capture("auth-b5", merchant, None)
+            second = integrated_capture.capture("auth-b5", merchant, None)
+            self.assertEqual(first, second)
+            self.assertEqual(first["capture_id"], "capture-b5")
+            self.assertEqual(capture.call_count, 2)
+            self.assertEqual(capture.call_args_list[0], capture.call_args_list[1])
+            status = integrated.payment_status(self.quote.id, self.request)
+            self.assertTrue(any(x["status"] == "succeeded" and x["paypal_capture_id"] == "capture-b5" for x in status["operations"]))
+            with self.db.transaction() as conn:
+                self.assertEqual(conn.execute("SELECT count(*) AS n FROM payment_fulfillments").fetchone()["n"], 1)
+                self.assertEqual(conn.execute("SELECT count(*) AS n FROM payment_operations WHERE operation_type = 'capture'").fetchone()["n"], 1)
+
+    def test_b5_shared_lock_excludes_reconciliation_during_submission(self):
+        env = {"B4_MERCHANT_TOKEN": "x" * 40}
+        with patch.dict(os.environ, env, clear=True), patch.object(integrated, "database", self.db.transaction), patch.object(provider, "create_order") as call:
+            with integrated.payment_lock(self.quote.id):
+                with self.assertRaises(HTTPException) as error:
+                    integrated.reconcile(self.quote.id, "order", "Bearer " + "x" * 40)
+        self.assertEqual(error.exception.status_code, 409)
+        call.assert_not_called()
+
+    def test_b5_saved_authorization_recovers_after_allocation_failure(self):
+        reply = {"purchase_units": [{"payments": {"authorizations": [{"id": "auth-recover", "status": "CREATED", "amount": {"currency_code": "USD", "value": "354.00"}}]}}]}
+        env = {"B4_MERCHANT_TOKEN": "x" * 40}
+        with patch.dict(os.environ, env, clear=True), patch.object(integrated, "database", self.db.transaction), patch.object(integrated, "adapter", return_value=self.quotes), patch.object(provider, "create_order", return_value={"id": "order-recover"}), patch.object(provider, "authorize_order", return_value=reply) as authorize:
+            integrated.create_order(self.quote.id, self.request)
+            with patch.object(self.quotes, "commit_allocation", side_effect=DomainError("storage_unavailable")):
+                with self.assertRaises(HTTPException) as error:
+                    integrated.authorize("order-recover", self.request)
+            self.assertEqual(error.exception.status_code, 503)
+            with self.db.transaction() as conn:
+                row = conn.execute("UPDATE payment_operations SET created_at = clock_timestamp() - interval '2 hours' WHERE quote_id = %s AND operation_type = 'authorize' RETURNING status, paypal_authorization_id", (self.quote.id,)).fetchone()
+            self.assertEqual(row["status"], "unknown")
+            self.assertEqual(row["paypal_authorization_id"], "auth-recover")
+            result = integrated.reconcile(self.quote.id, "authorize", "Bearer " + "x" * 40)
+            self.assertEqual(result["authorization_id"], "auth-recover")
+            self.assertEqual(self.quotes.get_quote("buyer_1", self.quote.id).state, "allocated")
+            self.assertEqual(authorize.call_count, 1)
+
+    def test_b5_reconciled_authorization_survives_allocation_failure(self):
+        reply = {"purchase_units": [{"payments": {"authorizations": [{"id": "auth-retry", "status": "CREATED", "amount": {"currency_code": "USD", "value": "354.00"}}]}}]}
+        with patch.dict(os.environ, {"B4_MERCHANT_TOKEN": "x" * 40}, clear=True), patch.object(integrated, "database", self.db.transaction), patch.object(integrated, "adapter", return_value=self.quotes), patch.object(provider, "create_order", return_value={"id": "order-retry"}), patch.object(provider, "authorize_order", side_effect=[provider.ProviderError("timeout"), reply]) as authorize:
+            integrated.create_order(self.quote.id, self.request)
+            with self.assertRaises(HTTPException):
+                integrated.authorize("order-retry", self.request)
+            with self.db.transaction() as conn:
+                conn.execute("UPDATE payment_operations SET created_at = clock_timestamp() - interval '2 minutes' WHERE quote_id = %s AND operation_type = 'authorize'", (self.quote.id,))
+            with patch.object(self.quotes, "commit_allocation", side_effect=DomainError("storage_unavailable")):
+                with self.assertRaises(HTTPException) as error:
+                    integrated.reconcile(self.quote.id, "authorize", "Bearer " + "x" * 40)
+            self.assertEqual(error.exception.status_code, 503)
+            with self.db.transaction() as conn:
+                row = conn.execute("UPDATE payment_operations SET created_at = clock_timestamp() - interval '2 hours' WHERE quote_id = %s AND operation_type = 'authorize' RETURNING status, paypal_authorization_id", (self.quote.id,)).fetchone()
+            self.assertEqual((row["status"], row["paypal_authorization_id"]), ("unknown", "auth-retry"))
+            recovered = integrated.reconcile(self.quote.id, "authorize", "Bearer " + "x" * 40)
+            self.assertEqual(recovered["authorization_id"], "auth-retry")
+            self.assertEqual(self.quotes.get_quote("buyer_1", self.quote.id).state, "allocated")
+            self.assertEqual(authorize.call_count, 2)
+            self.assertEqual(authorize.call_args_list[0], authorize.call_args_list[1])
 
 
 if __name__ == "__main__":

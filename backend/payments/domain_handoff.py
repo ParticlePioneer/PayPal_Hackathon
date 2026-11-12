@@ -20,7 +20,7 @@ class AuthorizationResult:
 
 
 def authorize_reserved_quote(quotes, session_id: str, quote_id: str,
-                             operation_id: str, order_id: str, *, expected_cents: int | None = None) -> AuthorizationResult:
+                             operation_id: str, order_id: str, *, expected_cents: int | None = None, on_verified=None) -> AuthorizationResult:
     """Claim first; never release after a potentially submitted provider call.
 
     The caller owns persistence, locking and ensuring the same operation ID is
@@ -44,6 +44,11 @@ def authorize_reserved_quote(quotes, session_id: str, quote_id: str,
             raise provider.ProviderError("Authorization response could not be verified")
     except (provider.ProviderError, AttributeError, TypeError, IndexError):
         raise PaymentUncertain("Authorization outcome requires reconciliation") from None
+    if on_verified is not None:
+        try:
+            on_verified(authorization_id)
+        except Exception:
+            raise PaymentUncertain("Authorization persistence requires reconciliation") from None
     try:
         quotes.commit_allocation(operation_id)
     except DomainError:

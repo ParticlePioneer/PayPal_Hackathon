@@ -65,3 +65,11 @@ The frontend is built by Render with the public PayPal client ID and live API mo
 For the isolated database check, set `TEST_DATABASE_URL` to a **disposable** PostgreSQL database using an account that can create and drop schemas. Run `python -m unittest discover -s backend/payments/tests -v`. The test creates and deletes a uniquely named `b4_test_...` schema; without the variable it is skipped. Never put a database URL in chat or source control.
 
 For a coordinated demo deployment only, `B4_SEED_SCENARIO=split` and `B4_ACKNOWLEDGE_SYNTHETIC_STOCK=true` explicitly seed the two simulated batches at startup after migrations. The seed is repeat-safe and refuses conflicting existing batch metadata; it does not clear, replace, or release stock. Remove both variables after successful seeding. The `shortfall` fixture uses the same IDs with different quantities and must use a separate clean database or schema. Never seed a shared database without coordinating with its owner.
+
+## B5 integrated capture in progress
+
+The integrated merchant capture path is disabled by default. Its deployment,
+simulated fulfillment, lost-response retry and evidence steps are documented in
+[B5 Sandbox rehearsal](B5_REHEARSAL.md). The earlier B3 capture instructions
+apply only to the isolated USD 1 harness. Live B5 capture and release acceptance
+remain to be verified; unit and disposable-database tests use simulated providers.
