@@ -31,28 +31,41 @@ export default function CheckoutSlot({
     useState<PaymentQuoteStatusResponse | null>(null);
   const [checkingPayment, setCheckingPayment] = useState<boolean>(false);
   const [statusCheckedFor, setStatusCheckedFor] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  const [paymentStatusChecked, setPaymentStatusChecked] = useState<boolean>(false);
+  const [paymentStatusError, setPaymentStatusError] = useState<string | null>(null);
+  const [clockNow, setClockNow] = useState<number>(() => Date.now());
 
   const quote = view?.status === "quoted" ? view.quote : null;
   const quoteId = quote?.id ?? "";
+  const quoteIsUnexpired =
+    quote !== null &&
+    Number.isFinite(Date.parse(quote.expires_at)) &&
+    Date.parse(quote.expires_at) > clockNow;
 
   useEffect(() => {
     if (!quoteId) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [quoteId]);
 
   const fetchPaymentStatus = useCallback(async () => {
     if (!quoteId) {
       setPaymentRecord(null);
+      setStatusCheckedFor(null);
+      setPaymentStatusChecked(false);
+      setPaymentStatusError(null);
       return;
     }
     setCheckingPayment(true);
+    setPaymentStatusError(null);
     try {
       const result = await adapter.getPaymentStatus(quoteId);
       setPaymentRecord(result);
       setStatusCheckedFor(result ? quoteId : null);
+      setPaymentStatusChecked(Boolean(result));
+      if (!result && mode === "api") {
+        setPaymentStatusError("Could not verify the current payment status.");
+      }
       if (result) {
         const cap = result.operations.find(
           (op) => op.operation_type === "capture" && op.status === "succeeded"
@@ -69,18 +82,30 @@ export default function CheckoutSlot({
           setButtonStatus("pending");
         } else if (auth) {
           setButtonStatus("authorized");
+        } else {
+          setButtonStatus("idle");
         }
       }
+    } catch (err) {
+      setStatusCheckedFor(null);
+      setPaymentStatusChecked(false);
+      setPaymentStatusError(
+        err instanceof Error
+          ? err.message
+          : "Could not verify the current payment status."
+      );
     } finally {
       setCheckingPayment(false);
     }
-  }, [adapter, quoteId]);
+  }, [adapter, quoteId, mode]);
 
   // Reset status when negotiation/quote changes and query persisted payment state
   useEffect(() => {
     setButtonStatus("idle");
     setPaymentRecord(null);
     setStatusCheckedFor(null);
+    setPaymentStatusChecked(false);
+    setPaymentStatusError(null);
     if (quoteId) {
       void fetchPaymentStatus();
     }
@@ -192,8 +217,10 @@ export default function CheckoutSlot({
 
   // Only pass non-empty quoteId to B's CheckoutButton when quote is active, not pending, and not already authorized
   const effectiveQuoteIdForButton =
-    mode === "api" && quote && Date.parse(quote.expires_at) > now &&
-    statusCheckedFor === quote.id && !checkingPayment && !hasUncertainOp && !hasFailedOp && !isAlreadyAuthorizedOrCaptured
+    mode === "api" && quote && quoteIsUnexpired &&
+    statusCheckedFor === quote.id && paymentStatusChecked && !checkingPayment &&
+    !paymentStatusError && buttonStatus !== "pending" && !hasUncertainOp &&
+    !hasFailedOp && !isAlreadyAuthorizedOrCaptured
       ? quote.id
       : "";
 
@@ -249,12 +276,19 @@ export default function CheckoutSlot({
       )}
 
       {/* Status Messages for Pending / Authorized / Cancelled / Error */}
-      {(buttonStatus === "pending" || hasUncertainOp) && (
+      {(buttonStatus === "pending" || hasUncertainOp || paymentStatusError) && (
         <div className="payment-alert alert-pending" role="alert">
-          <strong>Payment Outcome Pending / Uncertain:</strong>
+          <strong>
+            {paymentStatusError
+              ? "Payment Status Could Not Be Verified:"
+              : "Payment Outcome Pending / Uncertain:"}
+          </strong>
           <p>
-            An authorization request is in progress or awaiting provider reconciliation.{" "}
-            <strong>Do not start a second checkout or create a new quote.</strong> Click &ldquo;Query Payment Status&rdquo; below to check if the authorization completed.
+            {paymentStatusError
+              ? `${paymentStatusError} Checkout is disabled until the payment status can be confirmed.`
+              : "An authorization request is in progress or awaiting provider reconciliation."}{" "}
+            <strong>Do not start a second checkout or create a new quote.</strong>{" "}
+            Retry the status check below to confirm whether authorization completed.
           </p>
           <button
             type="button"
@@ -264,7 +298,7 @@ export default function CheckoutSlot({
           >
             {checkingPayment
               ? "Checking Status..."
-              : "Query Payment Status (GET /api/payments/quotes/{id})"}
+              : "Retry Payment Status Check"}
           </button>
         </div>
       )}
@@ -315,25 +349,24 @@ export default function CheckoutSlot({
         </div>
       )}
 
-      {/* Member B's Official Component Slot (frontend/src/CheckoutButton.tsx) */}
-      <div className="b-checkout-slot-box">
-        <div className="slot-label-row">
-          <span className="slot-title">
-            Member B Checkout Component Slot (<code>&lt;CheckoutButton /&gt;</code>)
-          </span>
-          {buttonStatus === "checkout_unavailable" && (
-            <span className="slot-note">
-              (<code>VITE_PAYPAL_CLIENT_ID</code> not set in browser env — B&apos;s component reported <code>checkout_unavailable</code>)
-            </span>
-          )}
+      {checkingPayment && (
+        <div className="payment-alert alert-pending" role="status" aria-live="polite">
+          <span className="activity-spinner" aria-hidden="true" />
+          Verifying existing payment operations. Checkout stays disabled until the status is confirmed.
         </div>
+      )}
 
-        <div className="paypal-button-mount">
-          <CheckoutButton
-            quoteId={effectiveQuoteIdForButton}
-            onStatusChange={handleBComponentStatusChange}
-          />
+      {quote && !quoteIsUnexpired && (
+        <div className="payment-alert alert-cancelled" role="status">
+          <strong>This quote has expired.</strong> Checkout is disabled. Refresh the negotiation to confirm the released reservation.
         </div>
+      )}
+
+      <div className="paypal-checkout-container">
+        <CheckoutButton
+          quoteId={effectiveQuoteIdForButton}
+          onStatusChange={handleBComponentStatusChange}
+        />
       </div>
 
       {/* Local Fixture Mode Placeholder Controls (C1/C3 requirement: test buyer journey without PayPal credentials) */}

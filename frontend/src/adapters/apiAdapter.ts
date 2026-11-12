@@ -111,23 +111,19 @@ export class LiveApiAdapter implements NegotiationAdapter {
     quoteId: string
   ): Promise<PaymentQuoteStatusResponse | null> {
     const base = getApiBaseUrl();
-    try {
-      const response = await fetch(
-        `${base}/api/payments/quotes/${encodeURIComponent(quoteId)}`,
-        {
-          method: "GET",
-          credentials: "same-origin",
-        }
-      );
-      if (response.status === 404) {
-        return null;
+    const response = await fetch(
+      `${base}/api/payments/quotes/${encodeURIComponent(quoteId)}`,
+      {
+        method: "GET",
+        credentials: "same-origin",
       }
-      if (!response.ok) {
-        return null;
-      }
-      return (await response.json()) as PaymentQuoteStatusResponse;
-    } catch {
+    );
+    if (response.status === 404) {
       return null;
     }
+    if (!response.ok) {
+      throw await parseApiError(response);
+    }
+    return (await response.json()) as PaymentQuoteStatusResponse;
   }
 }

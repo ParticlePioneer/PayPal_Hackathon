@@ -51,6 +51,12 @@ export default function NegotiationTranscript({
     view !== null &&
     (view.status === "negotiating" || view.status === "retryable_error") &&
     view.version < 6;
+  const activeAgent =
+    view && (view.status === "negotiating" || view.status === "retryable_error")
+      ? view.version % 2 === 0
+        ? "Buyer"
+        : "Seller"
+      : null;
 
   return (
     <section className="card transcript-card" aria-labelledby="transcript-heading">
@@ -79,6 +85,56 @@ export default function NegotiationTranscript({
         )}
       </div>
 
+      {view && (
+        <div
+          className="turn-progress"
+          role="group"
+          aria-label={`Negotiation progress: ${view.version} of 6 turns used`}
+        >
+          <div className="turn-progress-heading">
+            <strong>Negotiation progress</strong>
+            <span>
+              {view.version} of 6 turns used
+              {activeAgent
+                ? ` · ${activeAgent} agent next`
+                : ` · ${view.status.replace("_", " ")}`}
+            </span>
+          </div>
+          <ol className="turn-progress-track">
+            {Array.from({ length: 6 }, (_, index) => {
+              const isComplete = index < view.version;
+              const isActive = canAdvance && index === view.version;
+              const agent = index % 2 === 0 ? "Buyer" : "Seller";
+              return (
+                <li
+                  key={index}
+                  className={`turn-progress-step ${
+                    isComplete ? "step-complete" : ""
+                  } ${isActive ? "step-active" : ""}`}
+                  aria-label={`Turn ${index + 1}: ${agent}${
+                    isComplete ? ", completed" : isActive ? ", next" : ", upcoming"
+                  }`}
+                  aria-current={isActive ? "step" : undefined}
+                >
+                  <span className="turn-progress-node">
+                    {isComplete ? "✓" : index + 1}
+                  </span>
+                  <span className="turn-progress-agent">{agent}</span>
+                </li>
+              );
+            })}
+          </ol>
+          {busy && (
+            <div className="agent-activity" role="status" aria-live="polite">
+              <span className="activity-spinner" aria-hidden="true" />
+              {autoRunning
+                ? "Agents are negotiating through the remaining turns…"
+                : `The ${activeAgent ?? "agent"} agent is working on this turn…`}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Interactive Turn Controls */}
       <div className="turn-controls-bar" role="toolbar" aria-label="Negotiation turn controls">
         {!view ? (
@@ -93,6 +149,9 @@ export default function NegotiationTranscript({
               disabled={!canAdvance || busy || autoRunning}
               onClick={onAdvanceTurn}
             >
+              {busy && !autoRunning && (
+                <span className="activity-spinner button-spinner" aria-hidden="true" />
+              )}
               {busy && !autoRunning
                 ? "Running Turn..."
                 : view.status === "retryable_error"
@@ -106,6 +165,9 @@ export default function NegotiationTranscript({
               disabled={!canAdvance || busy || autoRunning}
               onClick={onAutoRunTurns}
             >
+              {autoRunning && (
+                <span className="activity-spinner button-spinner" aria-hidden="true" />
+              )}
               {autoRunning
                 ? "Auto-Negotiating..."
                 : "Complete Negotiation (Auto-Step)"}

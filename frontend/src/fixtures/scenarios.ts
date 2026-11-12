@@ -18,6 +18,11 @@ export const APPROVED_DEFAULT_REQUEST: CreateNegotiationRequest = {
   preferred_color: "navy",
 };
 
+export const DEFAULT_ORDER_REQUEST: CreateNegotiationRequest = {
+  ...APPROVED_DEFAULT_REQUEST,
+  minimum_by_date: [],
+};
+
 export interface FixtureScenarioMeta {
   id: FixtureScenarioId;
   title: string;

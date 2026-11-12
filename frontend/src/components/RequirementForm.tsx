@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Color, CreateNegotiationRequest, DeliveryMinimum } from "../types";
 import {
   APPROVED_DEFAULT_REQUEST,
@@ -9,6 +9,7 @@ import {
 interface RequirementFormProps {
   initialRequest: CreateNegotiationRequest;
   disabled: boolean;
+  canStartNegotiation: boolean;
   hasActiveNegotiation: boolean;
   onStartNegotiation: (payload: CreateNegotiationRequest) => void;
   onLoadPreset: (preset: CreateNegotiationRequest) => void;
@@ -17,6 +18,7 @@ interface RequirementFormProps {
 export default function RequirementForm({
   initialRequest,
   disabled,
+  canStartNegotiation,
   hasActiveNegotiation,
   onStartNegotiation,
   onLoadPreset,
@@ -35,6 +37,17 @@ export default function RequirementForm({
   const [deadlines, setDeadlines] = useState<DeliveryMinimum[]>(
     initialRequest.minimum_by_date
   );
+  const [selectedMilestone, setSelectedMilestone] = useState<number>(0);
+
+  useEffect(() => {
+    setSku(initialRequest.sku);
+    setQuantity(initialRequest.quantity);
+    setBudgetDollars((initialRequest.budget_cents / 100).toFixed(2));
+    setAllowedColors([...initialRequest.allowed_colors]);
+    setPreferredColor(initialRequest.preferred_color);
+    setDeadlines(initialRequest.minimum_by_date.map((milestone) => ({ ...milestone })));
+    setSelectedMilestone(0);
+  }, [initialRequest]);
 
   const parsedBudgetCents = Math.round(Number(budgetDollars) * 100);
   const currentPayload: CreateNegotiationRequest = {
@@ -51,6 +64,21 @@ export default function RequirementForm({
 
   const validationErrors = validateNegotiationRequest(currentPayload);
   const isValid = validationErrors.length === 0;
+  const scheduledQuantity =
+    deadlines.length > 0 ? deadlines[deadlines.length - 1].qty : 0;
+  const fulfillmentPercent =
+    quantity > 0
+      ? Math.min(100, Math.max(0, (scheduledQuantity / quantity) * 100))
+      : 0;
+  const activeMilestoneIndex = Math.min(
+    selectedMilestone,
+    Math.max(0, deadlines.length - 1)
+  );
+  const activeMilestone = deadlines[activeMilestoneIndex];
+  const previousMilestoneQty =
+    activeMilestoneIndex === 0
+      ? 0
+      : deadlines[activeMilestoneIndex - 1]?.qty ?? 0;
 
   function handleColorToggle(color: Color) {
     setAllowedColors((prev) => {
@@ -89,8 +117,38 @@ export default function RequirementForm({
   }
 
   function handleRemoveDeadline(index: number) {
-    if (deadlines.length <= 1) return;
     setDeadlines((prev) => prev.filter((_, idx) => idx !== index));
+    setSelectedMilestone((current) =>
+      current === index ? Math.max(0, index - 1) : current > index ? current - 1 : current
+    );
+  }
+
+  function handleMilestoneTabKeyDown(
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number
+  ) {
+    const tabs =
+      event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+        '[role="tab"]'
+      );
+    if (!tabs?.length) return;
+
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") {
+      nextIndex = (index + 1) % tabs.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (index - 1 + tabs.length) % tabs.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = tabs.length - 1;
+    }
+
+    if (nextIndex !== null) {
+      event.preventDefault();
+      setSelectedMilestone(nextIndex);
+      tabs[nextIndex].focus();
+    }
   }
 
   function handleResetToH0Fixture() {
@@ -122,7 +180,7 @@ export default function RequirementForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!isValid || disabled) return;
+    if (!isValid || disabled || !canStartNegotiation) return;
     onStartNegotiation(currentPayload);
   }
 
@@ -248,6 +306,12 @@ export default function RequirementForm({
           </div>
 
           <div className="deadlines-list">
+            {deadlines.length === 0 && (
+              <p className="milestone-empty-state">
+                No delivery milestones yet. Add one when you need a delivery
+                deadline.
+              </p>
+            )}
             {deadlines.map((d, idx) => {
               const prevQty = idx === 0 ? 0 : deadlines[idx - 1].qty;
               const batchDelta = Math.max(0, d.qty - prevQty);
@@ -289,17 +353,15 @@ export default function RequirementForm({
                         ? `At least ${d.qty} shirts by ${d.date || "date"}`
                         : `+${batchDelta} more (${d.qty} cumulative) by ${d.date || "date"}`}
                     </span>
-                    {deadlines.length > 1 && (
-                      <button
-                        type="button"
-                        className="btn-link-danger"
-                        disabled={disabled}
-                        onClick={() => handleRemoveDeadline(idx)}
-                        aria-label={`Remove milestone ${idx + 1}`}
-                      >
-                        Remove
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="btn-link-danger"
+                      disabled={disabled}
+                      onClick={() => handleRemoveDeadline(idx)}
+                      aria-label={`Remove milestone ${idx + 1}`}
+                    >
+                      Remove
+                    </button>
                   </div>
                 </div>
               );
@@ -307,10 +369,122 @@ export default function RequirementForm({
           </div>
         </div>
 
+        <aside className="order-preview" aria-label="Live order summary">
+          <div className="order-preview-header">
+            <div>
+              <span className="preview-eyebrow">LIVE ORDER SUMMARY</span>
+              <h3 className="sub-heading">
+                {quantity > 0 ? `${quantity} shirts` : "Order quantity needed"}
+                {sku.trim() ? ` · ${sku.trim()}` : ""}
+              </h3>
+            </div>
+            <span
+              className={`preview-state ${
+                isValid ? "preview-state-ready" : "preview-state-editing"
+              }`}
+            >
+              <span className="preview-state-dot" aria-hidden="true" />
+              {isValid
+                ? "Ready to negotiate"
+                : "Needs attention"}
+            </span>
+          </div>
+          {!isValid && (
+            <p className="preview-validation-note" role="status" aria-live="polite">
+              <strong>What needs fixing:</strong>{" "}
+              {deadlines.length === 0
+                ? "Add at least one delivery milestone to continue."
+                : validationErrors[0]}
+            </p>
+          )}
+
+          <div
+            className="fulfillment-meter"
+            role="progressbar"
+            aria-label="Final milestone quantity compared with total order quantity"
+            aria-valuemin={0}
+            aria-valuemax={Math.max(0, quantity)}
+            aria-valuenow={Math.max(0, Math.min(quantity, scheduledQuantity))}
+          >
+            <span
+              className="fulfillment-meter-fill"
+              style={{ width: `${fulfillmentPercent}%` }}
+            />
+          </div>
+          <div className="preview-facts">
+            <span>
+              <strong>
+                {Math.max(0, scheduledQuantity)} / {Math.max(0, quantity)}
+              </strong>{" "}
+              scheduled by final milestone
+            </span>
+            <span>
+              {allowedColors.length > 0
+                ? allowedColors.join(" + ")
+                : "No colors selected"}
+              {preferredColor ? ` · prefers ${preferredColor}` : ""}
+            </span>
+          </div>
+
+          <div
+            className="preview-milestones"
+            role="tablist"
+            aria-label="Delivery milestones"
+          >
+            {deadlines.map((milestone, index) => {
+              const priorQuantity = index === 0 ? 0 : deadlines[index - 1].qty;
+              const batchQuantity = Math.max(0, milestone.qty - priorQuantity);
+              return (
+                <button
+                  type="button"
+                  className={`milestone-tab ${
+                    activeMilestoneIndex === index ? "active" : ""
+                  }`}
+                  id={`preview-milestone-tab-${index}`}
+                  key={`${index}-${milestone.date}`}
+                  role="tab"
+                  aria-selected={activeMilestoneIndex === index}
+                  aria-controls="preview-milestone-panel"
+                  tabIndex={activeMilestoneIndex === index ? 0 : -1}
+                  onClick={() => setSelectedMilestone(index)}
+                  onKeyDown={(event) => handleMilestoneTabKeyDown(event, index)}
+                >
+                  <span>{milestone.date || "Choose a date"}</span>
+                  <strong>
+                    {milestone.qty} total
+                    {index > 0 ? ` · +${batchQuantity}` : ""}
+                  </strong>
+                </button>
+              );
+            })}
+          </div>
+          {activeMilestone && (
+            <div
+              className="milestone-tab-panel"
+              id="preview-milestone-panel"
+              role="tabpanel"
+              aria-labelledby={`preview-milestone-tab-${activeMilestoneIndex}`}
+              tabIndex={0}
+            >
+              <span className="timeline-marker" aria-hidden="true" />
+              <span>
+                <strong>
+                  {Math.max(0, activeMilestone.qty - previousMilestoneQty)} new
+                  shirts
+                </strong>{" "}
+                arrive by {activeMilestone.date || "the selected date"};{" "}
+                {activeMilestone.qty} shirts delivered cumulatively.
+              </span>
+            </div>
+          )}
+        </aside>
+
         {/* Strictly Separated Private Budget Box (C2 requirement) */}
         <div className="private-budget-box" role="region" aria-labelledby="private-budget-title">
           <div className="private-budget-header">
-            <span className="badge badge-private">PRIVATE BUYER INPUT — SERVER-ONLY</span>
+            <span className="badge badge-private">
+              Private buyer input · server-side only
+            </span>
             <h3 id="private-budget-title" className="private-title">
               Maximum Inclusive Budget (<code>budget_cents</code>)
             </h3>
@@ -357,7 +531,7 @@ export default function RequirementForm({
           <button
             type="submit"
             className="btn-primary btn-large"
-            disabled={!isValid || disabled}
+            disabled={!isValid || disabled || !canStartNegotiation}
           >
             {hasActiveNegotiation
               ? "Start New Negotiation with These Terms"
