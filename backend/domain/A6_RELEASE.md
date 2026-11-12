@@ -1,12 +1,25 @@
-# A6 release preparation — signoff pending
+# A6 release handoff
 
-The domain implementation can be exercised locally with PostgreSQL and
-explicitly synthetic fixtures. **This is not a release signoff.** Gemini 3.6
-has passed a live action smoke and a synthetic-policy live negotiation locally;
-actual merchant policy and integrated A/B/C checkout are still pending. An A5
-live comparison was attempted but is incomplete; its results and the final
-release configuration must be recorded against the release commit before
-claiming completion.
+## Owner confirmation — November 12, 2026
+
+The Member A owner confirmed that the remaining work had been checked locally,
+that those checks were satisfactory, and that this is the final handoff. This
+is an owner-reported confirmation; the specific test output, test environment,
+release commit and individual outcomes were not supplied in this conversation.
+It does not change the separately recorded results below, including the skipped
+PostgreSQL tests and incomplete live comparisons observed in this workspace.
+
+The owner subsequently confirmed that Member B finished B4 and that the full
+deployed website and real-time workflow were checked and working. This is an
+owner-reported confirmation; deployment URL, commit, and individual Sandbox
+transaction evidence were not provided in this conversation.
+
+The domain implementation and integrated OpenRouter host are available for
+local testing with explicitly synthetic fixtures. The owner has confirmed the
+local handoff above. Independent current-commit PostgreSQL evidence, complete
+live-model evaluation, and coordinated integrated Sandbox verification were not
+established in this workspace. Actual merchant policy and inventory are not
+supplied by the synthetic fixtures.
 
 ## Dependencies and application integration
 
@@ -16,25 +29,22 @@ Install both the host and domain requirements into the release environment:
 .\.venv\Scripts\python.exe -B -m pip install -r backend/requirements.txt -r backend/domain/requirements.txt
 ```
 
-The existing Render build uses only `backend/requirements.txt`, which does not
-declare the domain's `google-genai` or `httpx` requirements. Member B owns
-deployment configuration and must include the domain requirements during
-integration. The current `backend/main.py` mounts payment routes but does not
-mount the A4 router. It must also provide a trusted server-owned session and
-seller policy as described in [API.md](API.md). The local virtual environment
-contains additional libraries; its passing checks do not prove a clean Render
-build or deployed integration.
+The Render build installs both requirements files and builds the frontend.
+The integrated host mounts the domain router when `B4_ENABLED=true`, with a
+server-owned session and an explicit seller floor. See [API.md](API.md) and
+[payment integration setup](../payments/README.md). The local virtual
+environment's passing checks do not establish a deployed end-to-end flow.
 
 ## Model selection
 
-The user approved `gemini-3.6-flash` as the local configured model. It passed a
-real action smoke and completed one live negotiation with synthetic policy; see
-[A1_STATUS.md](A1_STATUS.md). The earlier 3.8 and 3.7 requests returned HTTP 504
-and 503 respectively. `GEMINI_MODEL` is required explicitly; the domain client
-has no automatic fallback. The deployment must explicitly configure the tested
-model, and the team must repeat release checks and record A5 live comparison
-results against the release commit. Do not label fixture output as live model
-evidence or put keys in source control.
+The current live client uses OpenRouter. Its selected model is
+`dots-studio/dots-3-note-preview:free`, with 4096 output tokens, 30000 ms per
+turn, up to six turns and a 180000 ms evaluation deadline per case. Configuration
+and commands are documented in [OPENROUTER.md](OPENROUTER.md). A real buyer
+smoke has parsed successfully. Earlier OpenRouter six-case attempts included
+timeouts, provider errors and ineligible proposals; do not count an incomplete
+case as a pass. Gemini results in older status records are historical, not
+evidence for the selected provider. No provider or fixture fallback is automatic.
 
 ## Synthetic stock seed
 
@@ -71,6 +81,39 @@ unknown payment claims require reconciliation, not expiry-based release.
 
 ## Reproducible local checks
 
+### Current local evidence — November 12, 2026
+
+The code checkout at `c9f1807` was checked with local release-document changes
+pending. The backend suite reported **545 passed, 68 skipped**; the skipped
+tests include PostgreSQL gates because `TEST_DATABASE_URL` was not configured.
+`pip check` and the frontend production build passed. Configuration validation
+selected `dots-studio/dots-3-note-preview:free`; it did not itself contact the
+provider. A prior actual OpenRouter buyer smoke on the integrated client parsed
+an action successfully.
+
+A live in-memory comparison at 30 seconds per turn used synthetic scenarios,
+the current OpenRouter client and a 4096-token output limit. The scripted
+baseline matched six cases. The live model matched feasible split, budget
+shortfall, depleted stock and ordinary order; impossible deadline and forbidden
+color timed out and remain incomplete. The split and ordinary agreements were
+validated in memory only; no quote, reservation or payment was issued. The
+depleted-stock case models a snapshot, not concurrent buyers. Local provider
+traces and complete conversations can contain sensitive data and should not be
+committed or shared without review.
+
+A separate diagnostic with both the per-turn and provider timeouts raised to
+45 seconds matched five cases; impossible deadline timed out on the seller's
+second turn. This is not a pass of the six-case live gate, and it did not change
+the 30-second release defaults. The 45-second run's forbidden-color result was
+no deal at the six-turn limit, with four ineligible proposals. Do not combine
+results from the two configurations into a single successful evaluation.
+
+The approved disposable PostgreSQL Docker command failed because the Docker
+engine was unavailable. No test database was configured; therefore the current
+checkout's A3/A4/A5 database and A6 seed gates remain unverified. Earlier
+PostgreSQL evidence in [PERSISTENCE.md](PERSISTENCE.md) is historical and does
+not replace this release check.
+
 Set `TEST_DATABASE_URL` separately to a disposable PostgreSQL database whose
 account may create schemas. Tests skip database checks if it is missing; a
 skipped run cannot establish the seed or concurrency gates. From the repository
@@ -91,15 +134,20 @@ Fixed fixture business dates are November 13 and 16, 2026; expiry uses the
 database's real UTC clock. Treat fixture dates as a demo clock, not a promise
 about live inventory.
 
-## Outstanding release checks
+## Checks not independently established in this workspace
+
+The owner has confirmed final local verification and that B4 and the deployed
+real-time website were checked and working. The items below preserve the
+earlier workspace evidence gaps; they are not a claim that the owner's later
+checks failed.
 
 1. Confirm the real merchant's floor and stock and use them as trusted server
    inputs; the synthetic 30000-cent A5 floor is not merchant approval.
-2. Verify the configured Gemini model in the release environment with a real
-   action, live negotiation and six-case comparison; keep provider failures visible.
-3. Member B mounts the domain router and adapter, establishes the shared trusted
-   session and payment reconciliation, installs both dependency sets, and runs
-   domain migrations before payment migrations.
+2. Verify the configured OpenRouter model in the release environment with a real
+   action, live negotiation and complete six-case comparison; keep provider
+   failures visible.
+3. Coordinate with Member B to verify the integrated host, trusted session,
+   payment reconciliation and migration order on the release configuration.
 4. Exercise the final integrated release and repeat-safe seeding on a clean,
    approved test database; record the exact commit and observed results. A live
    payment must never be inferred from a synthetic fixture.

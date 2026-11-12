@@ -1,5 +1,8 @@
 # A1 model configuration and structured-action smoke check
 
+This is historical Gemini documentation. For the current OpenRouter client and
+commands, see [OPENROUTER.md](OPENROUTER.md).
+
 This task adds one Gemini action call per invocation. It does not implement the
 A2 negotiation loop, commercial validation, quote issuance, stock reservations,
 database work, payment integration, or HTTP routes.

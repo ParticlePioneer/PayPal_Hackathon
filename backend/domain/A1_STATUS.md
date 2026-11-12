@@ -1,5 +1,9 @@
 # A1 verification status
 
+This document records historical Gemini verification. The current integrated
+provider is OpenRouter; see [OPENROUTER.md](OPENROUTER.md) and
+[A6_RELEASE.md](A6_RELEASE.md) for current configuration and release status.
+
 Recorded November 11, 2026, after the explicit selection of `gemini-3.8-flash`.
 This is a verification record, not a claim that A1 or A2 passed its live gate.
 
