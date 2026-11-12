@@ -15,6 +15,8 @@ router = APIRouter()
 
 
 def require_merchant(authorization: str | None):
+    if os.getenv("B4_ENABLED", "").lower() == "true":
+        raise HTTPException(404, "Not found")
     require_harness()
     if os.getenv("B3_CAPTURE_ENABLED", "").lower() != "true":
         raise HTTPException(404, "Not found")
@@ -84,6 +86,9 @@ def capture(authorization_id: str, authorization: str | None = Header(default=No
 @router.post("/api/merchant/payments/quotes/{quote_id}/reconcile/{operation_type}")
 def reconcile(quote_id: str, operation_type: str, authorization: str | None = Header(default=None)):
     """Retry an uncertain operation using its original persisted request ID."""
+    if os.getenv("B4_ENABLED", "").lower() == "true":
+        from .integrated import reconcile as integrated_reconcile
+        return integrated_reconcile(quote_id, operation_type, authorization)
     require_merchant(authorization)
     if operation_type not in {"order", "authorize"}:
         raise HTTPException(404, "Not found")

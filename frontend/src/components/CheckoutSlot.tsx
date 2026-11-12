@@ -30,9 +30,18 @@ export default function CheckoutSlot({
   const [paymentRecord, setPaymentRecord] =
     useState<PaymentQuoteStatusResponse | null>(null);
   const [checkingPayment, setCheckingPayment] = useState<boolean>(false);
+  const [statusCheckedFor, setStatusCheckedFor] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const quote = view?.status === "quoted" ? view.quote : null;
   const quoteId = quote?.id ?? "";
+
+  useEffect(() => {
+    if (!quoteId) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [quoteId]);
 
   const fetchPaymentStatus = useCallback(async () => {
     if (!quoteId) {
@@ -43,6 +52,7 @@ export default function CheckoutSlot({
     try {
       const result = await adapter.getPaymentStatus(quoteId);
       setPaymentRecord(result);
+      setStatusCheckedFor(result ? quoteId : null);
       if (result) {
         const cap = result.operations.find(
           (op) => op.operation_type === "capture" && op.status === "succeeded"
@@ -70,6 +80,7 @@ export default function CheckoutSlot({
   useEffect(() => {
     setButtonStatus("idle");
     setPaymentRecord(null);
+    setStatusCheckedFor(null);
     if (quoteId) {
       void fetchPaymentStatus();
     }
@@ -112,6 +123,7 @@ export default function CheckoutSlot({
       (o) => o.status === "pending" || o.status === "unknown"
     )
   );
+  const hasFailedOp = Boolean(paymentRecord?.operations.some((o) => o.status === "failed"));
   const isAlreadyAuthorizedOrCaptured =
     buttonStatus === "authorized" ||
     buttonStatus === "captured" ||
@@ -180,7 +192,8 @@ export default function CheckoutSlot({
 
   // Only pass non-empty quoteId to B's CheckoutButton when quote is active, not pending, and not already authorized
   const effectiveQuoteIdForButton =
-    quote && !hasUncertainOp && !isAlreadyAuthorizedOrCaptured
+    mode === "api" && quote && Date.parse(quote.expires_at) > now &&
+    statusCheckedFor === quote.id && !checkingPayment && !hasUncertainOp && !hasFailedOp && !isAlreadyAuthorizedOrCaptured
       ? quote.id
       : "";
 

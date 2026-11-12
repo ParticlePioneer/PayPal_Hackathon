@@ -3,7 +3,7 @@ services:
     name: agentnegotiate
     runtime: python
     plan: free
-    buildCommand: pip install -r backend/requirements.txt
+    buildCommand: pip install -r backend/requirements.txt -r backend/domain/requirements.txt && npm ci --prefix frontend && VITE_PAYPAL_CLIENT_ID="$PAYPAL_CLIENT_ID" VITE_DEFAULT_MODE=api npm run build --prefix frontend
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:

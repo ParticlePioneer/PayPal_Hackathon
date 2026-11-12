@@ -77,6 +77,9 @@ def start_session(request: Request, response: Response, b2_session: str | None =
 
 @router.post("/api/payments/orders")
 def create_order(body: OrderRequest, request: Request, b2_session: str | None = Cookie(default=None)):
+    if os.getenv("B4_ENABLED", "").lower() == "true":
+        from .integrated import create_order as integrated_create_order
+        return integrated_create_order(body.quote_id, request)
     require_harness()
     same_origin(request)
     owner = session_id(b2_session)
@@ -109,6 +112,9 @@ def create_order(body: OrderRequest, request: Request, b2_session: str | None = 
 
 @router.post("/api/payments/orders/{order_id}/authorize")
 def authorize(order_id: str, request: Request, b2_session: str | None = Cookie(default=None)):
+    if os.getenv("B4_ENABLED", "").lower() == "true":
+        from .integrated import authorize as integrated_authorize
+        return integrated_authorize(order_id, request)
     require_harness()
     same_origin(request)
     owner = session_id(b2_session)
@@ -145,7 +151,10 @@ def authorize(order_id: str, request: Request, b2_session: str | None = Cookie(d
 
 
 @router.get("/api/payments/quotes/{quote_id}")
-def payment_status(quote_id: str, b2_session: str | None = Cookie(default=None)):
+def payment_status(quote_id: str, request: Request, b2_session: str | None = Cookie(default=None)):
+    if os.getenv("B4_ENABLED", "").lower() == "true":
+        from .integrated import payment_status as integrated_payment_status
+        return integrated_payment_status(quote_id, request)
     require_harness()
     owner = session_id(b2_session)
     with database() as conn:

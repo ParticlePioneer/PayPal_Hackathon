@@ -51,7 +51,7 @@ function readInitialUiSession(): PersistedUiSession {
       ? urlMode
       : stored.mode === "api" || stored.mode === "fixture"
       ? stored.mode
-      : "fixture";
+      : import.meta.env.VITE_DEFAULT_MODE === "api" ? "api" : "fixture";
 
   const validScenarioIds = FIXTURE_SCENARIOS.map((s) => s.id);
   const scenarioId: FixtureScenarioId = validScenarioIds.includes(
