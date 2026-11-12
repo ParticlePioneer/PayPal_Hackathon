@@ -29,19 +29,25 @@ local tests using simulated providers. It is not a release signoff.
 - After the reconciliation change, the user ran the two saved-authorization
   recovery tests: `OK`. These use a disposable schema and simulated providers.
 - User ran `test_expired_quote_blocks_approval_and_new_order_without_provider_calls`:
-  `OK`. This new test is a local change after `1bf1e29` until committed; it
-  simulates domain time and provider responses.
+  `OK`. It was committed in `a4db247` and simulates domain time and provider responses.
 - Local backend suite before the latest test-only change: 552 passed, 72 skipped.
   Skips included database-dependent cases; do not count them as passed.
-  Frontend production build passed. The clean Render build reported in chat
-  was from an earlier deployment; record the final candidate build separately.
+  An isolated local checkout of `a4db247` installed declared backend dependencies,
+  ran payment tests (48 passed, 11 skipped), completed `npm ci` and built the
+  frontend without live PayPal configuration. Its health check returned OK.
+- A disposable database check against the clean checkout reported 2 domain and
+  3 payment migrations, 2 seeded batches, zero changes on repeat, and successful
+  removal of its uniquely named test schema. The check utility was copied into
+  that checkout for the run and must be committed separately.
+- The clean Render build reported in chat was from an earlier deployment;
+  record the final candidate build separately.
 
 ## Outstanding release work
 
-- Commit the stale-quote test and this evidence record; identify the exact
+- Commit the clean-install check and updated evidence; identify the final
   candidate commit and ensure it is the one deployed for release.
-- Rehearse clean setup against an isolated database, including migration order,
-  repeat-safe seeding and the production frontend build. Do not reset shared stock.
+- Reconfirm the final release configuration and deployed build, including the
+  frontend built in API mode with the public Sandbox client ID.
 - Record enabled flags and model ID, ensure temporary fault and migration flags
   are off, and give Member D this evidence plus the known limitations.
 - Tag a release candidate only after the above checks and the team's acceptance
