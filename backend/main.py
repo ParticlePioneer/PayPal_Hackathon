@@ -47,14 +47,9 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="AgentNegotiate", lifespan=lifespan)
-app.include_router(payment_router)
-app.include_router(capture_router)
 _frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
-app.mount("/assets", StaticFiles(directory=_frontend_dist / "assets", check_dir=False), name="frontend-assets")
 
 
-@app.middleware("http")
 async def integrated_session(request, call_next):
     if os.getenv("B4_ENABLED", "").lower() != "true":
         return await call_next(request)
@@ -72,12 +67,10 @@ async def integrated_session(request, call_next):
     return response
 
 
-@app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/", include_in_schema=False)
 def frontend():
     index = _frontend_dist / "index.html"
     if os.getenv("B4_ENABLED", "").lower() != "true" or not index.is_file():
@@ -85,16 +78,31 @@ def frontend():
     return FileResponse(index)
 
 
-@app.get("/test-checkout", response_class=HTMLResponse)
 def test_checkout():
     if not enabled():
         raise HTTPException(404, "Not found")
     return Path(__file__).with_name("payments").joinpath("harness.html").read_text(encoding="utf-8-sig")
 
 
-@app.get("/test-checkout.js")
 def test_checkout_script():
     if not enabled():
         raise HTTPException(404, "Not found")
     content = Path(__file__).with_name("payments").joinpath("harness.js").read_text(encoding="utf-8-sig")
     return Response(content, media_type="application/javascript")
+
+
+def create_app() -> FastAPI:
+    """A fresh host for startup/integration tests; the deployment entry point stays app."""
+    application = FastAPI(title="AgentNegotiate", lifespan=lifespan)
+    application.include_router(payment_router)
+    application.include_router(capture_router)
+    application.mount("/assets", StaticFiles(directory=_frontend_dist / "assets", check_dir=False), name="frontend-assets")
+    application.middleware("http")(integrated_session)
+    application.add_api_route("/health", health, methods=["GET"])
+    application.add_api_route("/", frontend, methods=["GET"], include_in_schema=False)
+    application.add_api_route("/test-checkout", test_checkout, methods=["GET"], response_class=HTMLResponse)
+    application.add_api_route("/test-checkout.js", test_checkout_script, methods=["GET"])
+    return application
+
+
+app = create_app()

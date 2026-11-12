@@ -55,9 +55,12 @@ For an uncertain order or authorization, the merchant can POST `/api/merchant/pa
 
 ## B4 integration under development
 
+Follow [B4 deployment and acceptance](B4_DEPLOYMENT.md) for the current
+OpenRouter environment settings, database tests and live browser checks.
+
 `B4_ENABLED=true` enables the integrated negotiation routes and quote-backed checkout. It requires `SESSION_SECRET`, `DATABASE_URL`, `OPENROUTER_API_KEY`, and an explicitly configured `MERCHANT_MINIMUM_TOTAL_CENTS`. `OPENROUTER_MODEL` defaults to the free Dots model; see [OpenRouter setup](../domain/OPENROUTER.md). The example 30000-cent floor is a simulated demo policy, not a real merchant commitment. Set `B4_MERCHANT_TOKEN` to a separate random secret of at least 32 characters to enable merchant reconciliation. B4 reconciliation reuses the persisted request ID and the domain claim; operations less than one minute old or more than one hour old are not automatically retried. Do not use B3's test-only recovery against integrated payments.
 
-The frontend is built by Render with the public PayPal client ID and live API mode. Domain migrations must be applied before payment migrations. Stock seeding is a separate, explicit operation; never reset or switch fixture stock on a shared database. The integrated code has not yet passed a live database, model, and Sandbox end-to-end test. Keep B4 disabled until those checks pass.
+The frontend is built by Render with the public PayPal client ID and live API mode. Domain migrations must be applied before payment migrations. Stock seeding is a separate, explicit operation; never reset or switch fixture stock on a shared database. The integrated code has not yet passed a live database, model, and Sandbox end-to-end test. Enable B4 for the coordinated acceptance deployment; do not mark it complete until those checks pass.
 
 For the isolated database check, set `TEST_DATABASE_URL` to a **disposable** PostgreSQL database using an account that can create and drop schemas. Run `python -m unittest discover -s backend/payments/tests -v`. The test creates and deletes a uniquely named `b4_test_...` schema; without the variable it is skipped. Never put a database URL in chat or source control.
 

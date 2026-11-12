@@ -25,6 +25,21 @@ services:
         value: '30000'
       - key: OPENROUTER_MAX_OUTPUT_TOKENS
         value: '4096'
+      # Enable B4 on the web service when ready for the integrated acceptance run.
+      - key: B4_ENABLED
+        value: 'false'
+      # Explicit simulated demo policy, in USD cents including delivery.
+      - key: MERCHANT_MINIMUM_TOTAL_CENTS
+        value: '30000'
+      # Enable for the coordinated migration deployment; domain runs before payments.
+      - key: B2_RUN_MIGRATIONS
+        value: 'false'
+      - key: B2_HARNESS_ENABLED
+        value: 'false'
+      - key: B3_CAPTURE_ENABLED
+        value: 'false'
+      - key: B3_ALLOW_FAULT_INJECTION
+        value: 'false'
 
 databases:
   - name: agentnegotiate-db
